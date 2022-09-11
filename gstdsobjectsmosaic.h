@@ -85,9 +85,6 @@ struct _GstDsExample
   // CUDA Stream used for allocating the CUDA task
   cudaStream_t cuda_stream;
 
-  // Host buffer to store RGB data for use by algorithm
-  void *host_rgb_buf;
-
   // the intermediate scratch buffer for conversions RGBA
   NvBufSurface *inter_buf;
 

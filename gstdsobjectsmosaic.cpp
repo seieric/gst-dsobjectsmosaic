@@ -338,21 +338,8 @@ gst_dsexample_start (GstBaseTransform * btrans)
     goto error;
   }
 
-  /* Create host memory for storing converted/scaled interleaved RGB data */
-  CHECK_CUDA_STATUS (cudaMallocHost (&dsexample->host_rgb_buf,
-          dsexample->processing_width * dsexample->processing_height *
-          RGB_BYTES_PER_PIXEL), "Could not allocate cuda host buffer");
-
-  GST_DEBUG_OBJECT (dsexample, "allocated cuda buffer %p \n",
-      dsexample->host_rgb_buf);
-
   return TRUE;
 error:
-  if (dsexample->host_rgb_buf) {
-    cudaFreeHost (dsexample->host_rgb_buf);
-    dsexample->host_rgb_buf = NULL;
-  }
-
   if (dsexample->cuda_stream) {
     cudaStreamDestroy (dsexample->cuda_stream);
     dsexample->cuda_stream = NULL;
@@ -375,11 +362,6 @@ gst_dsexample_stop (GstBaseTransform * btrans)
   if (dsexample->cuda_stream)
     cudaStreamDestroy (dsexample->cuda_stream);
   dsexample->cuda_stream = NULL;
-
-  if (dsexample->host_rgb_buf) {
-    cudaFreeHost (dsexample->host_rgb_buf);
-    dsexample->host_rgb_buf = NULL;
-  }
 
   return TRUE;
 }
