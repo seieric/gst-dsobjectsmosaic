@@ -37,7 +37,9 @@ enum
 {
   PROP_0,
   PROP_UNIQUE_ID,
-  PROP_GPU_DEVICE_ID
+  PROP_GPU_DEVICE_ID,
+  PROP_WIDTH,
+  PROP_HEIGHT
 };
 
 #define CHECK_NVDS_MEMORY_AND_GPUID(object, surface)  \
@@ -166,6 +168,21 @@ gst_dsexample_class_init (GstDsExampleClass * klass)
           GParamFlags
           (G_PARAM_READWRITE |
               G_PARAM_STATIC_STRINGS | GST_PARAM_MUTABLE_READY)));
+
+  g_object_class_install_property (gobject_class, PROP_WIDTH,
+      g_param_spec_uint ("width",
+          "video width",
+          "video width", 0, 
+          G_MAXUINT, 0, (GParamFlags)
+          (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
+
+  g_object_class_install_property (gobject_class, PROP_HEIGHT,
+      g_param_spec_uint ("height",
+          "video height",
+          "video height", 0, 
+          G_MAXUINT, 0, (GParamFlags)
+          (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
+
   /* Set sink and src pad capabilities */
   gst_element_class_add_pad_template (gstelement_class,
       gst_static_pad_template_get (&gst_dsexample_src_template));
@@ -216,6 +233,12 @@ gst_dsexample_set_property (GObject * object, guint prop_id,
     case PROP_GPU_DEVICE_ID:
       dsexample->gpu_id = g_value_get_uint (value);
       break;
+    case PROP_WIDTH:
+      dsexample->width = g_value_get_uint (value);
+      break;
+    case PROP_HEIGHT:
+      dsexample->height = g_value_get_uint (value);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -237,6 +260,12 @@ gst_dsexample_get_property (GObject * object, guint prop_id,
       break;
     case PROP_GPU_DEVICE_ID:
       g_value_set_uint (value, dsexample->gpu_id);
+      break;
+    case PROP_WIDTH:
+      g_value_set_uint (value, dsexample->width);
+      break;
+    case PROP_HEIGHT:
+      g_value_set_uint (value, dsexample->height);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -285,8 +314,8 @@ gst_dsexample_start (GstBaseTransform * btrans)
   /* An intermediate buffer for NV12/RGBA to BGR conversion  will be
    * required. Can be skipped if custom algorithm can work directly on NV12/RGBA. */
   create_params.gpuId  = dsexample->gpu_id;
-  create_params.width = 1920;
-  create_params.height = 1080;
+  create_params.width = dsexample->width;
+  create_params.height = dsexample->height;
   create_params.size = 0;
   create_params.colorFormat = NVBUF_COLOR_FORMAT_RGBA;
   create_params.layout = NVBUF_LAYOUT_PITCH;

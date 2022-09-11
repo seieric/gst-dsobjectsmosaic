@@ -93,6 +93,10 @@ struct _GstDsExample
 
   // GPU ID on which we expect to execute the task
   guint gpu_id;
+
+  // video width and height
+  guint width;
+  guint height;
 };
 
 // Boiler plate stuff
