@@ -398,7 +398,6 @@ gst_dsexample_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
   NvDsBatchMeta *batch_meta = NULL;
   NvDsFrameMeta *frame_meta = NULL;
   NvDsMetaList * l_frame = NULL;
-  guint i = 0;
 
   dsexample->frame_num++;
   CHECK_CUDA_STATUS (cudaSetDevice (dsexample->gpu_id),
@@ -475,6 +474,11 @@ gst_dsexample_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
       {
         obj_meta = (NvDsObjectMeta *) (l_obj->data);
 
+        /* Skip too small objects since they cause resizing issues. */
+        if (obj_meta->rect_params.width < MIN_INPUT_OBJECT_WIDTH ||
+            obj_meta->rect_params.height < MIN_INPUT_OBJECT_HEIGHT)
+          continue;
+
         if (blur_objects (dsexample, frame_meta->batch_id,
           &obj_meta->rect_params, in_mat) != GST_FLOW_OK) {
         /* Error in blurring, skip processing on object. */
@@ -486,13 +490,6 @@ gst_dsexample_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
           }
           return GST_FLOW_ERROR;
         }
-        continue;
-
-        /* Should not process on objects smaller than MIN_INPUT_OBJECT_WIDTH x MIN_INPUT_OBJECT_HEIGHT
-         * since it will cause hardware scaling issues. */
-        if (obj_meta->rect_params.width < MIN_INPUT_OBJECT_WIDTH ||
-            obj_meta->rect_params.height < MIN_INPUT_OBJECT_HEIGHT)
-          continue;
       }
 
       status = cuCtxSynchronize();
