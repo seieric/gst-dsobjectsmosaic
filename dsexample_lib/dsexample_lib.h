@@ -49,18 +49,8 @@ typedef struct
   char label[MAX_LABEL_SIZE];
 } DsExampleObject;
 
-// Output data returned after processing
-typedef struct
-{
-  int numObjects;
-  DsExampleObject object[4];
-} DsExampleOutput;
-
 // Initialize library context
 DsExampleCtx * DsExampleCtxInit (DsExampleInitParams *init_params);
-
-// Dequeue processed output
-DsExampleOutput *DsExampleProcess (DsExampleCtx *ctx, unsigned char *data);
 
 // Deinitialize library context
 void DsExampleCtxDeinit (DsExampleCtx *ctx);

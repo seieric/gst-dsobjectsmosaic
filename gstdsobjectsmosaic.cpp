@@ -126,9 +126,6 @@ static gboolean gst_dsexample_stop (GstBaseTransform * btrans);
 static GstFlowReturn gst_dsexample_transform_ip (GstBaseTransform *
     btrans, GstBuffer * inbuf);
 
-static void attach_metadata_object (GstDsExample * dsexample,
-    NvDsObjectMeta * obj_meta, DsExampleOutput * output);
-
 /* Install properties, set sink and src pad capabilities, override the required
  * functions of the base class, These are common to all instances of the
  * element.
@@ -656,7 +653,6 @@ gst_dsexample_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
   GstMapInfo in_map_info;
   GstFlowReturn flow_ret = GST_FLOW_ERROR;
   gdouble scale_ratio = 1.0;
-  DsExampleOutput *output;
 
   NvBufSurface *surface = NULL;
   NvDsBatchMeta *batch_meta = NULL;
@@ -766,14 +762,6 @@ gst_dsexample_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
         //  /* Error in conversion, skip processing on object. */
         //  continue;
         //}
-
-        /* Process the object crop to obtain label */
-        output = DsExampleProcess (dsexample->dsexamplelib_ctx,
-            dsexample->cvmat->data);
-        /* Attach labels for the object */
-        attach_metadata_object (dsexample, obj_meta, output);
-
-        free (output);
       }
 
       status = cuCtxSynchronize();
@@ -791,59 +779,6 @@ error:
   nvds_set_output_system_timestamp (inbuf, GST_ELEMENT_NAME (dsexample));
   gst_buffer_unmap (inbuf, &in_map_info);
   return flow_ret;
-}
-
-/**
- * Only update string label in an existing object metadata. No bounding boxes.
- * We assume only one label per object is generated
- */
-static void
-attach_metadata_object (GstDsExample * dsexample, NvDsObjectMeta * obj_meta,
-    DsExampleOutput * output)
-{
-  if (output->numObjects == 0)
-    return;
-  NvDsBatchMeta *batch_meta = obj_meta->base_meta.batch_meta;
-
-  NvDsClassifierMeta *classifier_meta =
-    nvds_acquire_classifier_meta_from_pool (batch_meta);
-
-  classifier_meta->unique_component_id = dsexample->unique_id;
-
-  NvDsLabelInfo *label_info =
-    nvds_acquire_label_info_meta_from_pool (batch_meta);
-  g_strlcpy (label_info->result_label, output->object[0].label, MAX_LABEL_SIZE);
-  nvds_add_label_info_meta_to_classifier(classifier_meta, label_info);
-  nvds_add_classifier_meta_to_object (obj_meta, classifier_meta);
-
-  nvds_acquire_meta_lock (batch_meta);
-  NvOSD_TextParams & text_params = obj_meta->text_params;
-  NvOSD_RectParams & rect_params = obj_meta->rect_params;
-
-  /* Below code to display the result */
-  /* Set black background for the text
-   * display_text required heap allocated memory */
-  if (text_params.display_text) {
-    gchar *conc_string = g_strconcat (text_params.display_text, " ",
-        output->object[0].label, NULL);
-    g_free (text_params.display_text);
-    text_params.display_text = conc_string;
-  } else {
-    /* Display text above the left top corner of the object */
-    text_params.x_offset = rect_params.left;
-    text_params.y_offset = rect_params.top - 10;
-    text_params.display_text = g_strdup (output->object[0].label);
-    /* Font face, size and color */
-    text_params.font_params.font_name = (char *)"Serif";
-    text_params.font_params.font_size = 11;
-    text_params.font_params.font_color = (NvOSD_ColorParams) {
-    1, 1, 1, 1};
-    /* Set black background for the text */
-    text_params.set_bg_clr = 1;
-    text_params.text_bg_clr = (NvOSD_ColorParams) {
-    0, 0, 0, 1};
-  }
-  nvds_release_meta_lock (batch_meta);
 }
 
 /**
