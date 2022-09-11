@@ -37,8 +37,6 @@ enum
 {
   PROP_0,
   PROP_UNIQUE_ID,
-  PROP_PROCESSING_WIDTH,
-  PROP_PROCESSING_HEIGHT,
   PROP_GPU_DEVICE_ID
 };
 
@@ -61,8 +59,6 @@ enum
 
 /* Default values for properties */
 #define DEFAULT_UNIQUE_ID 15
-#define DEFAULT_PROCESSING_WIDTH 640
-#define DEFAULT_PROCESSING_HEIGHT 480
 #define DEFAULT_GPU_ID 0
 
 #define RGB_BYTES_PER_PIXEL 3
@@ -162,20 +158,6 @@ gst_dsexample_class_init (GstDsExampleClass * klass)
           " element", 0, G_MAXUINT, DEFAULT_UNIQUE_ID, (GParamFlags)
           (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
 
-  g_object_class_install_property (gobject_class, PROP_PROCESSING_WIDTH,
-      g_param_spec_int ("processing-width",
-          "Processing Width",
-          "Width of the input buffer to algorithm",
-          1, G_MAXINT, DEFAULT_PROCESSING_WIDTH, (GParamFlags)
-          (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
-
-  g_object_class_install_property (gobject_class, PROP_PROCESSING_HEIGHT,
-      g_param_spec_int ("processing-height",
-          "Processing Height",
-          "Height of the input buffer to algorithm",
-          1, G_MAXINT, DEFAULT_PROCESSING_HEIGHT, (GParamFlags)
-          (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
-
   g_object_class_install_property (gobject_class, PROP_GPU_DEVICE_ID,
       g_param_spec_uint ("gpu-id",
           "Set GPU Device ID",
@@ -212,8 +194,6 @@ gst_dsexample_init (GstDsExample * dsexample)
 
   /* Initialize all property variables to default values */
   dsexample->unique_id = DEFAULT_UNIQUE_ID;
-  dsexample->processing_width = DEFAULT_PROCESSING_WIDTH;
-  dsexample->processing_height = DEFAULT_PROCESSING_HEIGHT;
   dsexample->gpu_id = DEFAULT_GPU_ID;
 
   /* This quark is required to identify NvDsMeta when iterating through
@@ -232,12 +212,6 @@ gst_dsexample_set_property (GObject * object, guint prop_id,
   switch (prop_id) {
     case PROP_UNIQUE_ID:
       dsexample->unique_id = g_value_get_uint (value);
-      break;
-    case PROP_PROCESSING_WIDTH:
-      dsexample->processing_width = g_value_get_int (value);
-      break;
-    case PROP_PROCESSING_HEIGHT:
-      dsexample->processing_height = g_value_get_int (value);
       break;
     case PROP_GPU_DEVICE_ID:
       dsexample->gpu_id = g_value_get_uint (value);
@@ -260,12 +234,6 @@ gst_dsexample_get_property (GObject * object, guint prop_id,
   switch (prop_id) {
     case PROP_UNIQUE_ID:
       g_value_set_uint (value, dsexample->unique_id);
-      break;
-    case PROP_PROCESSING_WIDTH:
-      g_value_set_int (value, dsexample->processing_width);
-      break;
-    case PROP_PROCESSING_HEIGHT:
-      g_value_set_int (value, dsexample->processing_height);
       break;
     case PROP_GPU_DEVICE_ID:
       g_value_set_uint (value, dsexample->gpu_id);
@@ -317,8 +285,6 @@ gst_dsexample_start (GstBaseTransform * btrans)
   /* An intermediate buffer for NV12/RGBA to BGR conversion  will be
    * required. Can be skipped if custom algorithm can work directly on NV12/RGBA. */
   create_params.gpuId  = dsexample->gpu_id;
-  //create_params.width  = dsexample->processing_width;
-  //create_params.height = dsexample->processing_height;
   create_params.width = 1920;
   create_params.height = 1080;
   create_params.size = 0;

@@ -91,10 +91,6 @@ struct _GstDsExample
   // Input video info (resolution, color format, framerate, etc)
   GstVideoInfo video_info;
 
-  // Resolution at which frames/objects should be processed
-  gint processing_width;
-  gint processing_height;
-
   // Flag which defince igpu/dgpu
   guint is_integrated;
 
