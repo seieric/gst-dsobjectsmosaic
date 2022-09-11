@@ -31,20 +31,14 @@
 #if __GNUC__ >= 8
 #pragma GCC diagnostic ignored "-Wclass-memaccess"
 #endif
-#ifdef WITH_OPENCV
-#include "opencv2/imgproc/imgproc.hpp"
-#include "opencv2/highgui/highgui.hpp"
 #include "opencv2/cudawarping.hpp"
 #include "opencv2/core/cuda.hpp"
-#include "opencv2/cudafilters.hpp"
-#endif
 #pragma GCC diagnostic pop
 
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <cudaEGL.h>
 #include "nvbufsurface.h"
-#include "nvbufsurftransform.h"
 #include "gst-nvquery.h"
 #include "gstnvdsmeta.h"
 
