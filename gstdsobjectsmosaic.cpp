@@ -346,18 +346,6 @@ gst_dsexample_start (GstBaseTransform * btrans)
   GST_DEBUG_OBJECT (dsexample, "allocated cuda buffer %p \n",
       dsexample->host_rgb_buf);
 
-  /* CV Mat containing interleaved RGB data. This call does not allocate memory.
-   * It uses host_rgb_buf as data. */
-  dsexample->cvmat =
-      new cv::Mat (dsexample->processing_height, dsexample->processing_width,
-      CV_8UC3, dsexample->host_rgb_buf,
-      dsexample->processing_width * RGB_BYTES_PER_PIXEL);
-
-  if (!dsexample->cvmat)
-    goto error;
-
-  GST_DEBUG_OBJECT (dsexample, "created CV Mat\n");
-
   return TRUE;
 error:
   if (dsexample->host_rgb_buf) {
@@ -388,15 +376,11 @@ gst_dsexample_stop (GstBaseTransform * btrans)
     cudaStreamDestroy (dsexample->cuda_stream);
   dsexample->cuda_stream = NULL;
 
-  delete dsexample->cvmat;
-  dsexample->cvmat = NULL;
-
   if (dsexample->host_rgb_buf) {
     cudaFreeHost (dsexample->host_rgb_buf);
     dsexample->host_rgb_buf = NULL;
   }
 
-  GST_DEBUG_OBJECT (dsexample, "deleted CV Mat \n");
   return TRUE;
 }
 
