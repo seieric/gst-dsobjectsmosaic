@@ -285,16 +285,10 @@ gst_dsexample_start (GstBaseTransform * btrans)
 {
   GstDsExample *dsexample = GST_DSEXAMPLE (btrans);
   NvBufSurfaceCreateParams create_params;
-  DsExampleInitParams init_params = {dsexample->processing_width, dsexample->processing_height};
 
   GstQuery *queryparams = NULL;
   guint batch_size = 1;
   int val = -1;
-
-  /* Algorithm specific initializations and resource allocation. */
-  dsexample->dsexamplelib_ctx = DsExampleCtxInit (&init_params);
-
-  GST_DEBUG_OBJECT (dsexample, "ctx lib %p \n", dsexample->dsexamplelib_ctx);
 
   CHECK_CUDA_STATUS (cudaSetDevice (dsexample->gpu_id),
       "Unable to set cuda device");
@@ -376,8 +370,6 @@ error:
     cudaStreamDestroy (dsexample->cuda_stream);
     dsexample->cuda_stream = NULL;
   }
-  if (dsexample->dsexamplelib_ctx)
-    DsExampleCtxDeinit (dsexample->dsexamplelib_ctx);
   return FALSE;
 }
 
@@ -406,13 +398,6 @@ gst_dsexample_stop (GstBaseTransform * btrans)
   }
 
   GST_DEBUG_OBJECT (dsexample, "deleted CV Mat \n");
-
-  /* Deinit the algorithm library */
-  DsExampleCtxDeinit (dsexample->dsexamplelib_ctx);
-  dsexample->dsexamplelib_ctx = NULL;
-
-  GST_DEBUG_OBJECT (dsexample, "ctx lib released \n");
-
   return TRUE;
 }
 

@@ -32,10 +32,6 @@ LIB:=libnvdsgst_dsobjectsmosaic.so
 
 NVDS_VERSION:=6.1
 
-DEP:=dsexample_lib/libdsexample.a
-DEP_FILES:=$(wildcard dsexample_lib/dsexample_lib.* )
-DEP_FILES-=$(DEP)
-
 CFLAGS+= -fPIC -DDS_VERSION=\"6.1.1\" \
 	 -I /usr/local/cuda-$(CUDA_VER)/include \
 	 -I /opt/nvidia/deepstream/deepstream/sources/includes \
@@ -45,7 +41,6 @@ GST_INSTALL_DIR?=/opt/nvidia/deepstream/deepstream-$(NVDS_VERSION)/lib/gst-plugi
 LIB_INSTALL_DIR?=/opt/nvidia/deepstream/deepstream-$(NVDS_VERSION)/lib/
 
 LIBS := -shared -Wl,-no-undefined \
-	-L dsexample_lib -ldsexample \
 	-L/usr/local/cuda-$(CUDA_VER)/lib64/ -lcudart -lcuda -ldl \
 	-lnppc -lnppig -lnpps -lnppicc -lnppidei \
 	-L$(LIB_INSTALL_DIR) -lnvdsgst_helper -lnvdsgst_meta -lnvds_meta -lnvbufsurface -lnvbufsurftransform\
@@ -64,12 +59,9 @@ all: $(LIB)
 	@echo $(CFLAGS)
 	$(CXX) -c -o $@ $(CFLAGS) $<
 
-$(LIB): $(OBJS) $(DEP) Makefile
+$(LIB): $(OBJS) Makefile
 	@echo $(CFLAGS)
 	$(CXX) -o $@ $(OBJS) $(LIBS)
-
-$(DEP): $(DEP_FILES)
-	$(MAKE) -C dsexample_lib/
 
 install: $(LIB)
 	cp -rv $(LIB) $(GST_INSTALL_DIR)
