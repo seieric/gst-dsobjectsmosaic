@@ -41,6 +41,7 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <cudaEGL.h>
+#include <set>
 #include "nvbufsurface.h"
 #include "gst-nvquery.h"
 #include "gstnvdsmeta.h"
@@ -100,6 +101,9 @@ struct _GstDsExample
   // video width and height
   guint width;
   guint height;
+
+  // class ids for which blur is applied
+  std::set<uint> *class_ids;
 };
 
 // Boiler plate stuff

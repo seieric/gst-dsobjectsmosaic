@@ -42,7 +42,8 @@ enum
   PROP_UNIQUE_ID,
   PROP_GPU_DEVICE_ID,
   PROP_WIDTH,
-  PROP_HEIGHT
+  PROP_HEIGHT,
+  PROP_CLASS_IDS
 };
 
 #define CHECK_NVDS_MEMORY_AND_GPUID(object, surface)  \
@@ -185,7 +186,14 @@ gst_dsexample_class_init (GstDsExampleClass * klass)
           "video height", 0, 
           G_MAXUINT, 0, (GParamFlags)
           (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
-
+  
+  g_object_class_install_property (gobject_class, PROP_CLASS_IDS,
+      g_param_spec_string ("class-ids",
+          "class ids",
+          "An array of colon-separated class ids for which blur is applied",
+          "", (GParamFlags)
+          (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
+  
   /* Set sink and src pad capabilities */
   gst_element_class_add_pad_template (gstelement_class,
       gst_static_pad_template_get (&gst_dsexample_src_template));
@@ -215,6 +223,7 @@ gst_dsexample_init (GstDsExample * dsexample)
   /* Initialize all property variables to default values */
   dsexample->unique_id = DEFAULT_UNIQUE_ID;
   dsexample->gpu_id = DEFAULT_GPU_ID;
+  dsexample->class_ids = new std::set<uint>;
 
   /* This quark is required to identify NvDsMeta when iterating through
    * the buffer metadatas */
@@ -241,6 +250,18 @@ gst_dsexample_set_property (GObject * object, guint prop_id,
       break;
     case PROP_HEIGHT:
       dsexample->height = g_value_get_uint (value);
+      break;
+    case PROP_CLASS_IDS:
+    {
+      std::stringstream str(g_value_get_string(value));
+      dsexample->class_ids->clear();
+      while(str.peek() != EOF) {
+        gint class_id;
+        str >> class_id;
+        dsexample->class_ids->insert(class_id);
+        str.get();
+      }
+    }
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -269,6 +290,14 @@ gst_dsexample_get_property (GObject * object, guint prop_id,
       break;
     case PROP_HEIGHT:
       g_value_set_uint (value, dsexample->height);
+      break;
+    case PROP_CLASS_IDS:
+    {
+      std::stringstream str;
+      for(const auto id : *dsexample->class_ids)
+        str << id << ";";
+      g_value_set_string (value, str.str ().c_str ());
+    }
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -360,6 +389,8 @@ gst_dsexample_stop (GstBaseTransform * btrans)
   if (dsexample->cuda_stream)
     cudaStreamDestroy (dsexample->cuda_stream);
   dsexample->cuda_stream = NULL;
+
+  delete dsexample->class_ids;
 
   return TRUE;
 }
@@ -509,6 +540,11 @@ gst_dsexample_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
         /* Skip too small objects since they cause resizing issues. */
         if (obj_meta->rect_params.width < MIN_INPUT_OBJECT_WIDTH ||
             obj_meta->rect_params.height < MIN_INPUT_OBJECT_HEIGHT)
+          continue;
+
+        /* apply blur only for objects with given class ids */
+        auto id_itr = dsexample->class_ids->find(obj_meta->class_id);
+        if ( id_itr == dsexample->class_ids->end() || *id_itr != obj_meta->class_id)
           continue;
 
         if (blur_objects (dsexample, frame_meta->batch_id,
