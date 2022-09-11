@@ -30,7 +30,6 @@
 #include <sys/time.h>
 GST_DEBUG_CATEGORY_STATIC (gst_dsexample_debug);
 #define GST_CAT_DEFAULT gst_dsexample_debug
-#define USE_EGLIMAGE 1
 static GQuark _dsmeta_quark = 0;
 
 /* Enum to identify properties */
@@ -425,182 +424,6 @@ error:
   return FALSE;
 }
 
-/**
- * Scale the entire frame to the processing resolution maintaining aspect ratio.
- * Or crop and scale objects to the processing resolution maintaining the aspect
- * ratio. Remove the padding required by hardware and convert from RGBA to RGB
- * using openCV. These steps can be skipped if the algorithm can work with
- * padded data and/or can work with RGBA.
- */
-static GstFlowReturn
-get_converted_mat (GstDsExample * dsexample, NvBufSurface *input_buf, gint idx,
-    NvOSD_RectParams * crop_rect_params, gdouble & ratio, gint input_width,
-    gint input_height)
-{
-  NvBufSurfTransform_Error err;
-  NvBufSurfTransformConfigParams transform_config_params;
-  NvBufSurfTransformParams transform_params;
-  NvBufSurfTransformRect src_rect;
-  NvBufSurfTransformRect dst_rect;
-  NvBufSurface ip_surf;
-  cv::Mat in_mat;
-  ip_surf = *input_buf;
-
-  ip_surf.numFilled = ip_surf.batchSize = 1;
-  ip_surf.surfaceList = &(input_buf->surfaceList[idx]);
-
-  gint src_left = GST_ROUND_UP_2((unsigned int)crop_rect_params->left);
-  gint src_top = GST_ROUND_UP_2((unsigned int)crop_rect_params->top);
-  gint src_width = GST_ROUND_DOWN_2((unsigned int)crop_rect_params->width);
-  gint src_height = GST_ROUND_DOWN_2((unsigned int)crop_rect_params->height);
-
-  /* Maintain aspect ratio */
-  double hdest = dsexample->processing_width * src_height / (double) src_width;
-  double wdest = dsexample->processing_height * src_width / (double) src_height;
-  guint dest_width, dest_height;
-
-  if (hdest <= dsexample->processing_height) {
-    dest_width = dsexample->processing_width;
-    dest_height = hdest;
-  } else {
-    dest_width = wdest;
-    dest_height = dsexample->processing_height;
-  }
-
-  /* Configure transform session parameters for the transformation */
-  transform_config_params.compute_mode = NvBufSurfTransformCompute_Default;
-  transform_config_params.gpu_id = dsexample->gpu_id;
-  transform_config_params.cuda_stream = dsexample->cuda_stream;
-
-  /* Set the transform session parameters for the conversions executed in this
-   * thread. */
-  err = NvBufSurfTransformSetSessionParams (&transform_config_params);
-  if (err != NvBufSurfTransformError_Success) {
-    GST_ELEMENT_ERROR (dsexample, STREAM, FAILED,
-        ("NvBufSurfTransformSetSessionParams failed with error %d", err), (NULL));
-    goto error;
-  }
-
-  /* Calculate scaling ratio while maintaining aspect ratio */
-  ratio = MIN (1.0 * dest_width/ src_width, 1.0 * dest_height / src_height);
-
-  if ((crop_rect_params->width == 0) || (crop_rect_params->height == 0)) {
-    GST_ELEMENT_ERROR (dsexample, STREAM, FAILED,
-        ("%s:crop_rect_params dimensions are zero",__func__), (NULL));
-    goto error;
-  }
-
-#ifdef __aarch64__
-  if (ratio <= 1.0 / 16 || ratio >= 16.0) {
-    /* Currently cannot scale by ratio > 16 or < 1/16 for Jetson */
-    goto error;
-  }
-#endif
-  /* Set the transform ROIs for source and destination */
-  src_rect = {(guint)src_top, (guint)src_left, (guint)src_width, (guint)src_height};
-  dst_rect = {0, 0, (guint)dest_width, (guint)dest_height};
-
-  /* Set the transform parameters */
-  transform_params.src_rect = &src_rect;
-  transform_params.dst_rect = &dst_rect;
-  transform_params.transform_flag =
-    NVBUFSURF_TRANSFORM_FILTER | NVBUFSURF_TRANSFORM_CROP_SRC |
-      NVBUFSURF_TRANSFORM_CROP_DST;
-  transform_params.transform_filter = NvBufSurfTransformInter_Default;
-
-  /* Memset the memory */
-  NvBufSurfaceMemSet (dsexample->inter_buf, 0, 0, 0);
-
-  GST_DEBUG_OBJECT (dsexample, "Scaling and converting input buffer\n");
-
-  /* Transformation scaling+format conversion if any. */
-  err = NvBufSurfTransform (&ip_surf, dsexample->inter_buf, &transform_params);
-  if (err != NvBufSurfTransformError_Success) {
-    GST_ELEMENT_ERROR (dsexample, STREAM, FAILED,
-        ("NvBufSurfTransform failed with error %d while converting buffer", err),
-        (NULL));
-    goto error;
-  }
-  /* Map the buffer so that it can be accessed by CPU */
-  if (NvBufSurfaceMap (dsexample->inter_buf, 0, 0, NVBUF_MAP_READ) != 0){
-    goto error;
-  }
-  if(dsexample->inter_buf->memType == NVBUF_MEM_SURFACE_ARRAY) {
-    /* Cache the mapped data for CPU access */
-    NvBufSurfaceSyncForCpu (dsexample->inter_buf, 0, 0);
-  }
-
-  /* Use openCV to remove padding and convert RGBA to BGR. Can be skipped if
-   * algorithm can handle padded RGBA data. */
-  in_mat =
-      cv::Mat (dsexample->processing_height, dsexample->processing_width,
-      CV_8UC4, dsexample->inter_buf->surfaceList[0].mappedAddr.addr[0],
-      dsexample->inter_buf->surfaceList[0].pitch);
-
-#if (CV_MAJOR_VERSION >= 4)
-  cv::cvtColor (in_mat, *dsexample->cvmat, cv::COLOR_RGBA2BGR);
-#else
-  cv::cvtColor (in_mat, *dsexample->cvmat, CV_RGBA2BGR);
-#endif
-
-    if (NvBufSurfaceUnMap (dsexample->inter_buf, 0, 0)){
-      goto error;
-    }
-
-  if(dsexample->is_integrated) {
-#ifdef __aarch64__
-    /* To use the converted buffer in CUDA, create an EGLImage and then use
-    * CUDA-EGL interop APIs */
-    if (USE_EGLIMAGE) {
-      if (NvBufSurfaceMapEglImage (dsexample->inter_buf, 0) !=0 ) {
-        goto error;
-      }
-
-      /* dsexample->inter_buf->surfaceList[0].mappedAddr.eglImage
-      * Use interop APIs cuGraphicsEGLRegisterImage and
-      * cuGraphicsResourceGetMappedEglFrame to access the buffer in CUDA */
-
-    static bool create_filter = true;
-    static cv::Ptr< cv::cuda::Filter > filter;
-    CUresult status;
-    CUeglFrame eglFrame;
-    CUgraphicsResource pResource = NULL;
-    cudaFree(0);
-    status = cuGraphicsEGLRegisterImage(&pResource,
-		dsexample->inter_buf->surfaceList[0].mappedAddr.eglImage,
-                CU_GRAPHICS_MAP_RESOURCE_FLAGS_NONE);
-    status = cuGraphicsResourceGetMappedEglFrame(&eglFrame, pResource, 0, 0);
-    status = cuCtxSynchronize();
-    if (create_filter) {
-        filter = cv::cuda::createSobelFilter(CV_8UC4, CV_8UC4, 1, 0, 3, 1, cv::BORDER_DEFAULT);
-        //filter = cv::cuda::createGaussianFilter(CV_8UC4, CV_8UC4, cv::Size(31,31), 0, 0, cv::BORDER_DEFAULT);
-        create_filter = false;
-    }
-    cv::cuda::GpuMat d_mat(dsexample->processing_height, dsexample->processing_width, CV_8UC4, eglFrame.frame.pPitch[0]);
-    filter->apply (d_mat, d_mat);
-    status = cuCtxSynchronize();
-    status = cuGraphicsUnregisterResource(pResource);
-
-    // apply back to the original buffer
-    transform_params.src_rect = &dst_rect;
-    transform_params.dst_rect = &src_rect;
-    NvBufSurfTransform (dsexample->inter_buf, &ip_surf, &transform_params);
-
-      /* Destroy the EGLImage */
-      NvBufSurfaceUnMapEglImage (dsexample->inter_buf, 0);
-    }
-#endif
-  }
-
-  /* We will first convert only the Region of Interest (the entire frame or the
-   * object bounding box) to RGB and then scale the converted RGB frame to
-   * processing resolution. */
-  return GST_FLOW_OK;
-
-error:
-  return GST_FLOW_ERROR;
-}
-
 /*
  * Blur the detected objects
  */
@@ -738,15 +561,6 @@ gst_dsexample_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
         if (obj_meta->rect_params.width < MIN_INPUT_OBJECT_WIDTH ||
             obj_meta->rect_params.height < MIN_INPUT_OBJECT_HEIGHT)
           continue;
-
-        /* Crop and scale the object */
-        //if (get_converted_mat (dsexample,
-        //      surface, frame_meta->batch_id, &obj_meta->rect_params,
-        //      scale_ratio, dsexample->video_info.width,
-        //      dsexample->video_info.height) != GST_FLOW_OK) {
-        //  /* Error in conversion, skip processing on object. */
-        //  continue;
-        //}
       }
 
       status = cuCtxSynchronize();
