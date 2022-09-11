@@ -1,4 +1,7 @@
 /**
+ * Copyright (c) 2022, seieric
+ * This software is based on DeepStream DsExample Plugin by NVIDIA.
+ *
  * Copyright (c) 2017-2021, NVIDIA CORPORATION.  All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
