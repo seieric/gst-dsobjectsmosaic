@@ -506,6 +506,9 @@ gst_dsexample_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
       l_frame = l_frame->next)
     {
       frame_meta = (NvDsFrameMeta *) (l_frame->data);
+      /* Skip all the blurring process when no objects are detected. */
+      if (frame_meta->num_obj_meta == 0)
+        continue;
 
       NvBufSurface ip_surf;
       ip_surf = *surface;
