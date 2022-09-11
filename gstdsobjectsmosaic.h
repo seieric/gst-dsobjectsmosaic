@@ -118,9 +118,6 @@ struct _GstDsExample
 
   // Boolean indicating if entire frame or cropped objects should be processed
   gboolean process_full_frame;
-
-  // Boolean indicating if to blur the detected objects
-  gboolean blur_objects;
 };
 
 // Boiler plate stuff

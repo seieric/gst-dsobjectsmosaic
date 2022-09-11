@@ -41,7 +41,6 @@ enum
   PROP_PROCESSING_WIDTH,
   PROP_PROCESSING_HEIGHT,
   PROP_PROCESS_FULL_FRAME,
-  PROP_BLUR_OBJECTS,
   PROP_GPU_DEVICE_ID
 };
 
@@ -67,7 +66,6 @@ enum
 #define DEFAULT_PROCESSING_WIDTH 640
 #define DEFAULT_PROCESSING_HEIGHT 480
 #define DEFAULT_PROCESS_FULL_FRAME TRUE
-#define DEFAULT_BLUR_OBJECTS FALSE
 #define DEFAULT_GPU_ID 0
 
 #define RGB_BYTES_PER_PIXEL 3
@@ -194,13 +192,6 @@ gst_dsexample_class_init (GstDsExampleClass * klass)
           "by primary detector", DEFAULT_PROCESS_FULL_FRAME, (GParamFlags)
           (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
 
-  g_object_class_install_property (gobject_class, PROP_BLUR_OBJECTS,
-      g_param_spec_boolean ("blur-objects",
-          "Blur Objects",
-          "Enable to blur the objects detected in full-frame=0 mode"
-          "by primary detector", DEFAULT_BLUR_OBJECTS, (GParamFlags)
-          (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
-
   g_object_class_install_property (gobject_class, PROP_GPU_DEVICE_ID,
       g_param_spec_uint ("gpu-id",
           "Set GPU Device ID",
@@ -240,7 +231,6 @@ gst_dsexample_init (GstDsExample * dsexample)
   dsexample->processing_width = DEFAULT_PROCESSING_WIDTH;
   dsexample->processing_height = DEFAULT_PROCESSING_HEIGHT;
   dsexample->process_full_frame = DEFAULT_PROCESS_FULL_FRAME;
-  dsexample->blur_objects = DEFAULT_BLUR_OBJECTS;
   dsexample->gpu_id = DEFAULT_GPU_ID;
 
   /* This quark is required to identify NvDsMeta when iterating through
@@ -268,9 +258,6 @@ gst_dsexample_set_property (GObject * object, guint prop_id,
       break;
     case PROP_PROCESS_FULL_FRAME:
       dsexample->process_full_frame = g_value_get_boolean (value);
-      break;
-    case PROP_BLUR_OBJECTS:
-      dsexample->blur_objects = g_value_get_boolean (value);
       break;
     case PROP_GPU_DEVICE_ID:
       dsexample->gpu_id = g_value_get_uint (value);
@@ -302,9 +289,6 @@ gst_dsexample_get_property (GObject * object, guint prop_id,
       break;
     case PROP_PROCESS_FULL_FRAME:
       g_value_set_boolean (value, dsexample->process_full_frame);
-      break;
-    case PROP_BLUR_OBJECTS:
-      g_value_set_boolean (value, dsexample->blur_objects);
       break;
     case PROP_GPU_DEVICE_ID:
       g_value_set_uint (value, dsexample->gpu_id);
@@ -355,7 +339,7 @@ gst_dsexample_start (GstBaseTransform * btrans)
       dsexample->batch_size);
   gst_query_unref (queryparams);
 
-  if (dsexample->process_full_frame && dsexample->blur_objects) {
+  if (dsexample->process_full_frame) {
     GST_ERROR ("Error: does not support blurring while processing full frame");
     goto error;
   }
@@ -473,7 +457,7 @@ gst_dsexample_set_caps (GstBaseTransform * btrans, GstCaps * incaps,
   /* Save the input video information, since this will be required later. */
   gst_video_info_from_caps (&dsexample->video_info, incaps);
 
-  if (dsexample->blur_objects && !dsexample->process_full_frame) {
+  if (!dsexample->process_full_frame) {
     /* requires RGBA format for blurring the objects in opencv */
      if (dsexample->video_info.finfo->format != GST_VIDEO_FORMAT_RGBA) {
       GST_ELEMENT_ERROR (dsexample, STREAM, FAILED,
@@ -772,12 +756,10 @@ gst_dsexample_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
     NvDsObjectMeta *obj_meta = NULL;
 
     if(!dsexample->is_integrated) {
-      if (dsexample->blur_objects) {
-        if (!(surface->memType == NVBUF_MEM_CUDA_UNIFIED || surface->memType == NVBUF_MEM_CUDA_PINNED)){
-          GST_ELEMENT_ERROR (dsexample, STREAM, FAILED,
-              ("%s:need NVBUF_MEM_CUDA_UNIFIED or NVBUF_MEM_CUDA_PINNED memory for opencv blurring",__func__), (NULL));
-          return GST_FLOW_ERROR;
-        }
+      if (!(surface->memType == NVBUF_MEM_CUDA_UNIFIED || surface->memType == NVBUF_MEM_CUDA_PINNED)){
+        GST_ELEMENT_ERROR (dsexample, STREAM, FAILED,
+            ("%s:need NVBUF_MEM_CUDA_UNIFIED or NVBUF_MEM_CUDA_PINNED memory for opencv blurring",__func__), (NULL));
+        return GST_FLOW_ERROR;
       }
     }
 
@@ -811,36 +793,23 @@ gst_dsexample_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
                   dsexample->inter_buf->surfaceList[0].planeParams.width[0],
                   CV_8UC4, eglFrame.frame.pPitch[0]);
 
-      // if (dsexample->blur_objects) {
-      //   /* Map the buffer so that it can be accessed by CPU */
-      //   if (surface->surfaceList[frame_meta->batch_id].mappedAddr.addr[0] == NULL){
-      //     if (NvBufSurfaceMap (surface, frame_meta->batch_id, 0, NVBUF_MAP_READ_WRITE) != 0){
-      //       GST_ELEMENT_ERROR (dsexample, STREAM, FAILED,
-      //           ("%s:buffer map to be accessed by CPU failed", __func__), (NULL));
-      //       return GST_FLOW_ERROR;
-      //     }
-      //   }
-      // }
-
       for (l_obj = frame_meta->obj_meta_list; l_obj != NULL;
           l_obj = l_obj->next)
       {
         obj_meta = (NvDsObjectMeta *) (l_obj->data);
 
-        if (dsexample->blur_objects) {      
-          if (blur_objects (dsexample, frame_meta->batch_id,
-            &obj_meta->rect_params, in_mat) != GST_FLOW_OK) {
-          /* Error in blurring, skip processing on object. */
+        if (blur_objects (dsexample, frame_meta->batch_id,
+          &obj_meta->rect_params, in_mat) != GST_FLOW_OK) {
+        /* Error in blurring, skip processing on object. */
+          GST_ELEMENT_ERROR (dsexample, STREAM, FAILED,
+          ("blurring the object failed"), (NULL));
+          if (NvBufSurfaceUnMapEglImage (dsexample->inter_buf, 0) != 0){
             GST_ELEMENT_ERROR (dsexample, STREAM, FAILED,
-            ("blurring the object failed"), (NULL));
-            if (NvBufSurfaceUnMapEglImage (dsexample->inter_buf, 0) != 0){
-              GST_ELEMENT_ERROR (dsexample, STREAM, FAILED,
-                ("%s:buffer unmap failed", __func__), (NULL));
-            }
-            return GST_FLOW_ERROR;
+              ("%s:buffer unmap failed", __func__), (NULL));
           }
-          continue;
+          return GST_FLOW_ERROR;
         }
+        continue;
 
         /* Should not process on objects smaller than MIN_INPUT_OBJECT_WIDTH x MIN_INPUT_OBJECT_HEIGHT
          * since it will cause hardware scaling issues. */
@@ -866,14 +835,12 @@ gst_dsexample_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
         free (output);
       }
 
-      if (dsexample->blur_objects) {
       status = cuCtxSynchronize();
       status = cuGraphicsUnregisterResource(pResource);
       // apply back to the original buffer
       NvBufSurfaceCopy (dsexample->inter_buf, &ip_surf);
       // Destroy the EGLImage
       NvBufSurfaceUnMapEglImage (dsexample->inter_buf, 0);
-      }
     }
   }
   flow_ret = GST_FLOW_OK;
