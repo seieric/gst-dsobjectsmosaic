@@ -37,8 +37,6 @@ typedef struct
   int processingWidth;
   // height at which frame/object will be scaled
   int processingHeight;
-  // Flag to indicate whether operating on crops of full frame
-  int fullFrame;
 } DsExampleInitParams;
 
 // Detected/Labelled object structure, stores bounding box info along with label

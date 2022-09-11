@@ -40,7 +40,6 @@ enum
   PROP_UNIQUE_ID,
   PROP_PROCESSING_WIDTH,
   PROP_PROCESSING_HEIGHT,
-  PROP_PROCESS_FULL_FRAME,
   PROP_GPU_DEVICE_ID
 };
 
@@ -65,7 +64,6 @@ enum
 #define DEFAULT_UNIQUE_ID 15
 #define DEFAULT_PROCESSING_WIDTH 640
 #define DEFAULT_PROCESSING_HEIGHT 480
-#define DEFAULT_PROCESS_FULL_FRAME TRUE
 #define DEFAULT_GPU_ID 0
 
 #define RGB_BYTES_PER_PIXEL 3
@@ -128,9 +126,6 @@ static gboolean gst_dsexample_stop (GstBaseTransform * btrans);
 static GstFlowReturn gst_dsexample_transform_ip (GstBaseTransform *
     btrans, GstBuffer * inbuf);
 
-static void
-attach_metadata_full_frame (GstDsExample * dsexample, NvDsFrameMeta *frame_meta,
-    gdouble scale_ratio, DsExampleOutput * output, guint batch_id);
 static void attach_metadata_object (GstDsExample * dsexample,
     NvDsObjectMeta * obj_meta, DsExampleOutput * output);
 
@@ -185,13 +180,6 @@ gst_dsexample_class_init (GstDsExampleClass * klass)
           1, G_MAXINT, DEFAULT_PROCESSING_HEIGHT, (GParamFlags)
           (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
 
-  g_object_class_install_property (gobject_class, PROP_PROCESS_FULL_FRAME,
-      g_param_spec_boolean ("full-frame",
-          "Full frame",
-          "Enable to process full frame or disable to process objects detected"
-          "by primary detector", DEFAULT_PROCESS_FULL_FRAME, (GParamFlags)
-          (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
-
   g_object_class_install_property (gobject_class, PROP_GPU_DEVICE_ID,
       g_param_spec_uint ("gpu-id",
           "Set GPU Device ID",
@@ -230,7 +218,6 @@ gst_dsexample_init (GstDsExample * dsexample)
   dsexample->unique_id = DEFAULT_UNIQUE_ID;
   dsexample->processing_width = DEFAULT_PROCESSING_WIDTH;
   dsexample->processing_height = DEFAULT_PROCESSING_HEIGHT;
-  dsexample->process_full_frame = DEFAULT_PROCESS_FULL_FRAME;
   dsexample->gpu_id = DEFAULT_GPU_ID;
 
   /* This quark is required to identify NvDsMeta when iterating through
@@ -255,9 +242,6 @@ gst_dsexample_set_property (GObject * object, guint prop_id,
       break;
     case PROP_PROCESSING_HEIGHT:
       dsexample->processing_height = g_value_get_int (value);
-      break;
-    case PROP_PROCESS_FULL_FRAME:
-      dsexample->process_full_frame = g_value_get_boolean (value);
       break;
     case PROP_GPU_DEVICE_ID:
       dsexample->gpu_id = g_value_get_uint (value);
@@ -287,9 +271,6 @@ gst_dsexample_get_property (GObject * object, guint prop_id,
     case PROP_PROCESSING_HEIGHT:
       g_value_set_int (value, dsexample->processing_height);
       break;
-    case PROP_PROCESS_FULL_FRAME:
-      g_value_set_boolean (value, dsexample->process_full_frame);
-      break;
     case PROP_GPU_DEVICE_ID:
       g_value_set_uint (value, dsexample->gpu_id);
       break;
@@ -307,10 +288,7 @@ gst_dsexample_start (GstBaseTransform * btrans)
 {
   GstDsExample *dsexample = GST_DSEXAMPLE (btrans);
   NvBufSurfaceCreateParams create_params;
-  DsExampleInitParams init_params =
-      { dsexample->processing_width, dsexample->processing_height,
-    dsexample->process_full_frame
-  };
+  DsExampleInitParams init_params = {dsexample->processing_width, dsexample->processing_height};
 
   GstQuery *queryparams = NULL;
   guint batch_size = 1;
@@ -338,11 +316,6 @@ gst_dsexample_start (GstBaseTransform * btrans)
   GST_DEBUG_OBJECT (dsexample, "Setting batch-size %d \n",
       dsexample->batch_size);
   gst_query_unref (queryparams);
-
-  if (dsexample->process_full_frame) {
-    GST_ERROR ("Error: does not support blurring while processing full frame");
-    goto error;
-  }
 
   CHECK_CUDA_STATUS (cudaStreamCreate (&dsexample->cuda_stream),
       "Could not create cuda stream");
@@ -457,14 +430,12 @@ gst_dsexample_set_caps (GstBaseTransform * btrans, GstCaps * incaps,
   /* Save the input video information, since this will be required later. */
   gst_video_info_from_caps (&dsexample->video_info, incaps);
 
-  if (!dsexample->process_full_frame) {
-    /* requires RGBA format for blurring the objects in opencv */
-     if (dsexample->video_info.finfo->format != GST_VIDEO_FORMAT_RGBA) {
-      GST_ELEMENT_ERROR (dsexample, STREAM, FAILED,
-          ("input format should be RGBA when using blur-objects property"), (NULL));
-      goto error;
-      }
-  }
+  /* requires RGBA format for blurring the objects in opencv */
+   if (dsexample->video_info.finfo->format != GST_VIDEO_FORMAT_RGBA) {
+    GST_ELEMENT_ERROR (dsexample, STREAM, FAILED,
+        ("input format should be RGBA when using blur-objects property"), (NULL));
+    goto error;
+    }
 
   return TRUE;
 
@@ -649,7 +620,7 @@ error:
 }
 
 /*
- * Blur the detected objects when processing in object mode (full-frame=0)
+ * Blur the detected objects
  */
 static GstFlowReturn
 blur_objects (GstDsExample * dsexample, gint idx,
@@ -719,37 +690,7 @@ gst_dsexample_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
     return GST_FLOW_ERROR;
   }
 
-  if (dsexample->process_full_frame) {
-    for (l_frame = batch_meta->frame_meta_list; l_frame != NULL;
-      l_frame = l_frame->next)
-    {
-      frame_meta = (NvDsFrameMeta *) (l_frame->data);
-      NvOSD_RectParams rect_params;
-
-      /* Scale the entire frame to processing resolution */
-      rect_params.left = 0;
-      rect_params.top = 0;
-      rect_params.width = dsexample->video_info.width;
-      rect_params.height = dsexample->video_info.height;
-
-      /* Scale and convert the frame */
-      if (get_converted_mat (dsexample, surface, i, &rect_params,
-            scale_ratio, dsexample->video_info.width,
-            dsexample->video_info.height) != GST_FLOW_OK) {
-        goto error;
-      }
-
-      /* Process to get the output */
-      output =
-          DsExampleProcess (dsexample->dsexamplelib_ctx,
-          dsexample->cvmat->data);
-      /* Attach the metadata for the full frame */
-      attach_metadata_full_frame (dsexample, frame_meta, scale_ratio, output, i);
-      i++;
-      free (output);
-    }
-
-  } else {
+  if (true) {
     /* Using object crops as input to the algorithm. The objects are detected by
      * the primary detector */
     NvDsMetaList * l_obj = NULL;
@@ -850,72 +791,6 @@ error:
   nvds_set_output_system_timestamp (inbuf, GST_ELEMENT_NAME (dsexample));
   gst_buffer_unmap (inbuf, &in_map_info);
   return flow_ret;
-}
-
-/**
- * Attach metadata for the full frame. We will be adding a new metadata.
- */
-static void
-attach_metadata_full_frame (GstDsExample * dsexample, NvDsFrameMeta *frame_meta,
-    gdouble scale_ratio, DsExampleOutput * output, guint batch_id)
-{
-  NvDsBatchMeta *batch_meta = frame_meta->base_meta.batch_meta;
-  NvDsObjectMeta *object_meta = NULL;
-  static gchar font_name[] = "Serif";
-  GST_DEBUG_OBJECT (dsexample, "Attaching metadata %d\n", output->numObjects);
-
-  for (gint i = 0; i < output->numObjects; i++) {
-    DsExampleObject *obj = &output->object[i];
-    object_meta = nvds_acquire_obj_meta_from_pool(batch_meta);
-    NvOSD_RectParams & rect_params = object_meta->rect_params;
-    NvOSD_TextParams & text_params = object_meta->text_params;
-
-    /* Assign bounding box coordinates */
-    rect_params.left = obj->left;
-    rect_params.top = obj->top;
-    rect_params.width = obj->width;
-    rect_params.height = obj->height;
-
-    /* Semi-transparent yellow background */
-    rect_params.has_bg_color = 0;
-    rect_params.bg_color = (NvOSD_ColorParams) {
-    1, 1, 0, 0.4};
-    /* Red border of width 6 */
-    rect_params.border_width = 3;
-    rect_params.border_color = (NvOSD_ColorParams) {
-    1, 0, 0, 1};
-
-    /* Scale the bounding boxes proportionally based on how the object/frame was
-     * scaled during input */
-    rect_params.left /= scale_ratio;
-    rect_params.top /= scale_ratio;
-    rect_params.width /= scale_ratio;
-    rect_params.height /= scale_ratio;
-    GST_DEBUG_OBJECT (dsexample, "Attaching rect%d of batch%u"
-        "  left->%f top->%f width->%f"
-        " height->%f label->%s\n", i, batch_id, rect_params.left,
-        rect_params.top, rect_params.width, rect_params.height, obj->label);
-
-    object_meta->object_id = UNTRACKED_OBJECT_ID;
-    g_strlcpy (object_meta->obj_label, obj->label, MAX_LABEL_SIZE);
-    /* display_text required heap allocated memory */
-    text_params.display_text = g_strdup (obj->label);
-    /* Display text above the left top corner of the object */
-    text_params.x_offset = rect_params.left;
-    text_params.y_offset = rect_params.top - 10;
-    /* Set black background for the text */
-    text_params.set_bg_clr = 1;
-    text_params.text_bg_clr = (NvOSD_ColorParams) {
-    0, 0, 0, 1};
-    /* Font face, size and color */
-    text_params.font_params.font_name = font_name;
-    text_params.font_params.font_size = 11;
-    text_params.font_params.font_color = (NvOSD_ColorParams) {
-    1, 1, 1, 1};
-
-    nvds_add_obj_meta_to_frame(frame_meta, object_meta, NULL);
-    frame_meta->bInferDone = TRUE;
-  }
 }
 
 /**

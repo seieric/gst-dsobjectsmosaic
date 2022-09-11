@@ -51,38 +51,16 @@ DsExampleProcess (DsExampleCtx * ctx, unsigned char *data)
     }
     // Fill output structure using processed output
     // Here, we fake some detected objects and labels
-    if (ctx->initParams.fullFrame)
+    out->numObjects = 1;
+    out->object[0] = (DsExampleObject)
     {
-        out->numObjects = 2;
-        out->object[0] = (DsExampleObject)
-        {
+        (float)(ctx->initParams.processingWidth) / 8,
+            (float)(ctx->initParams.processingHeight) / 8,
             (float)(ctx->initParams.processingWidth) / 8,
-                (float)(ctx->initParams.processingHeight) / 8,
-                (float)(ctx->initParams.processingWidth) / 8,
-                (float)(ctx->initParams.processingHeight) / 8, "Obj0"
-        };
-
-        out->object[1] = (DsExampleObject)
-        {
-            (float)(ctx->initParams.processingWidth) / 2,
-                (float)(ctx->initParams.processingHeight) / 2,
-                (float)(ctx->initParams.processingWidth) / 8,
-                (float)(ctx->initParams.processingHeight) / 8, "Obj1"
-        };
-    }
-    else
-    {
-        out->numObjects = 1;
-        out->object[0] = (DsExampleObject)
-        {
-            (float)(ctx->initParams.processingWidth) / 8,
-                (float)(ctx->initParams.processingHeight) / 8,
-                (float)(ctx->initParams.processingWidth) / 8,
-                (float)(ctx->initParams.processingHeight) / 8, ""
-        };
-        // Set the object label
-        snprintf (out->object[0].label, 64, "Obj_label");
-    }
+            (float)(ctx->initParams.processingHeight) / 8, ""
+    };
+    // Set the object label
+    snprintf (out->object[0].label, 64, "Obj_label");
 
     return out;
 }
