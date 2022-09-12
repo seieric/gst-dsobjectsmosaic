@@ -98,6 +98,9 @@ struct _GstDsExample
   // minimum confidence of objects to be blurred
   gdouble min_confidence;
 
+  // size of each square of mosaic
+  gint mosaic_size;
+
   // class ids for which blur is applied
   std::set<uint> *class_ids;
 };

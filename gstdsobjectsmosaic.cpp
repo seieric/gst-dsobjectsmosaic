@@ -42,6 +42,7 @@ enum
   PROP_UNIQUE_ID,
   PROP_GPU_DEVICE_ID,
   PROP_MIN_CONFIDENCE,
+  PROP_MOSAIC_SIZE,
   PROP_CLASS_IDS
 };
 
@@ -66,9 +67,7 @@ enum
 #define DEFAULT_UNIQUE_ID 15
 #define DEFAULT_GPU_ID 0
 #define DEFAULT_MIN_CONFIDENCE 0
-
-#define MIN_INPUT_OBJECT_WIDTH 16
-#define MIN_INPUT_OBJECT_HEIGHT 16
+#define DEFAULT_MOSAIC_SIZE 10
 
 #define CHECK_NPP_STATUS(npp_status,error_str) do { \
   if ((npp_status) != NPP_SUCCESS) { \
@@ -174,6 +173,13 @@ gst_dsexample_class_init (GstDsExampleClass * klass)
           "minimum confidence of objects to be blurred", 0, 
           1, DEFAULT_MIN_CONFIDENCE, (GParamFlags)
           (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
+
+  g_object_class_install_property (gobject_class, PROP_MOSAIC_SIZE,
+      g_param_spec_int ("mosaic-size",
+          "size of each square of mosaic",
+          "size of each square of mosaic", 10, 
+          G_MAXINT, DEFAULT_MOSAIC_SIZE, (GParamFlags)
+          (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
   
   g_object_class_install_property (gobject_class, PROP_CLASS_IDS,
       g_param_spec_string ("class-ids",
@@ -211,6 +217,7 @@ gst_dsexample_init (GstDsExample * dsexample)
   /* Initialize all property variables to default values */
   dsexample->unique_id = DEFAULT_UNIQUE_ID;
   dsexample->gpu_id = DEFAULT_GPU_ID;
+  dsexample->mosaic_size = DEFAULT_MOSAIC_SIZE;
   dsexample->class_ids = new std::set<uint>;
 
   /* This quark is required to identify NvDsMeta when iterating through
@@ -235,6 +242,9 @@ gst_dsexample_set_property (GObject * object, guint prop_id,
       break;
     case PROP_MIN_CONFIDENCE:
       dsexample->min_confidence = g_value_get_double (value);
+      break;
+    case PROP_MOSAIC_SIZE:
+      dsexample->mosaic_size = g_value_get_int (value);
       break;
     case PROP_CLASS_IDS:
     {
@@ -272,6 +282,9 @@ gst_dsexample_get_property (GObject * object, guint prop_id,
       break;
     case PROP_MIN_CONFIDENCE:
       g_value_set_double (value, dsexample->min_confidence);
+      break;
+    case PROP_MOSAIC_SIZE:
+      g_value_set_int (value, dsexample->mosaic_size);
       break;
     case PROP_CLASS_IDS:
     {
@@ -368,7 +381,7 @@ error:
  */
 static GstFlowReturn
 blur_objects (GstDsExample * dsexample, gint idx,
-    NvOSD_RectParams * crop_rect_params, cv::cuda::GpuMat in_mat)
+    NvOSD_RectParams * crop_rect_params, cv::cuda::GpuMat in_mat, cv::Size ksize)
 {
   cv::Rect crop_rect;
 
@@ -384,7 +397,7 @@ blur_objects (GstDsExample * dsexample, gint idx,
 
 /* cuda based mosaic */
   cv::cuda::GpuMat resized_mat;
-  cv::cuda::resize(in_mat(crop_rect), resized_mat, cv::Size(0, 0), 0.1, 0.1, cv::INTER_NEAREST);
+  cv::cuda::resize(in_mat(crop_rect), resized_mat, ksize, 0., 0, cv::INTER_NEAREST);
   cv::cuda::resize(resized_mat, in_mat(crop_rect), cv::Size(crop_rect_params->width, crop_rect_params->height), 0, 0, cv::INTER_NEAREST);
 
   return GST_FLOW_OK;
@@ -472,6 +485,7 @@ gst_dsexample_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
       status = cuGraphicsResourceGetMappedEglFrame(&eglFrame, pResource, 0, 0);
       status = cuCtxSynchronize();
 
+      cv::Size ksize;
       cv::cuda::GpuMat in_mat(ip_surf.surfaceList[0].planeParams.height[0],
                   ip_surf.surfaceList[0].planeParams.width[0],
                   CV_8UC4, eglFrame.frame.pPitch[0]);
@@ -482,8 +496,8 @@ gst_dsexample_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
         obj_meta = (NvDsObjectMeta *) (l_obj->data);
 
         /* Skip too small objects since they cause resizing issues. */
-        if (obj_meta->rect_params.width < MIN_INPUT_OBJECT_WIDTH ||
-            obj_meta->rect_params.height < MIN_INPUT_OBJECT_HEIGHT ||
+        if (obj_meta->rect_params.width < dsexample->mosaic_size*2 ||
+            obj_meta->rect_params.height < dsexample->mosaic_size*2 ||
             obj_meta->confidence < dsexample->min_confidence )
           continue;
 
@@ -492,8 +506,12 @@ gst_dsexample_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
         if ( id_itr == dsexample->class_ids->end() || *id_itr != obj_meta->class_id)
           continue;
 
+        /* Calculate scaling destination size. */
+        ksize = cv::Size (obj_meta->rect_params.width / dsexample->mosaic_size,
+                          obj_meta->rect_params.height / dsexample->mosaic_size);
+
         if (blur_objects (dsexample, frame_meta->batch_id,
-          &obj_meta->rect_params, in_mat) != GST_FLOW_OK) {
+          &obj_meta->rect_params, in_mat, ksize) != GST_FLOW_OK) {
         /* Error in blurring, skip processing on object. */
           GST_ELEMENT_ERROR (dsexample, STREAM, FAILED,
           ("blurring the object failed"), (NULL));
