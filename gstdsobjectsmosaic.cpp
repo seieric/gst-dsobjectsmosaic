@@ -31,8 +31,8 @@
 #include <fstream>
 #include "gstdsobjectsmosaic.h"
 #include <sys/time.h>
-GST_DEBUG_CATEGORY_STATIC (gst_dsexample_debug);
-#define GST_CAT_DEFAULT gst_dsexample_debug
+GST_DEBUG_CATEGORY_STATIC (gst_dsom_debug);
+#define GST_CAT_DEFAULT gst_dsom_debug
 static GQuark _dsmeta_quark = 0;
 
 /* Enum to identify properties */
@@ -88,7 +88,7 @@ enum
 /* By default NVIDIA Hardware allocated memory flows through the pipeline. We
  * will be processing on this type of memory only. */
 #define GST_CAPS_FEATURE_MEMORY_NVMM "memory:NVMM"
-static GstStaticPadTemplate gst_dsexample_sink_template =
+static GstStaticPadTemplate gst_dsom_sink_template =
 GST_STATIC_PAD_TEMPLATE ("sink",
     GST_PAD_SINK,
     GST_PAD_ALWAYS,
@@ -96,7 +96,7 @@ GST_STATIC_PAD_TEMPLATE ("sink",
         (GST_CAPS_FEATURE_MEMORY_NVMM,
             "{ RGBA }")));
 
-static GstStaticPadTemplate gst_dsexample_src_template =
+static GstStaticPadTemplate gst_dsom_src_template =
 GST_STATIC_PAD_TEMPLATE ("src",
     GST_PAD_SRC,
     GST_PAD_ALWAYS,
@@ -105,20 +105,20 @@ GST_STATIC_PAD_TEMPLATE ("src",
             "{ RGBA }")));
 
 /* Define our element type. Standard GObject/GStreamer boilerplate stuff */
-#define gst_dsexample_parent_class parent_class
-G_DEFINE_TYPE (GstDsExample, gst_dsexample, GST_TYPE_BASE_TRANSFORM);
+#define gst_dsom_parent_class parent_class
+G_DEFINE_TYPE (GstDsExample, gst_dsom, GST_TYPE_BASE_TRANSFORM);
 
-static void gst_dsexample_set_property (GObject * object, guint prop_id,
+static void gst_dsom_set_property (GObject * object, guint prop_id,
     const GValue * value, GParamSpec * pspec);
-static void gst_dsexample_get_property (GObject * object, guint prop_id,
+static void gst_dsom_get_property (GObject * object, guint prop_id,
     GValue * value, GParamSpec * pspec);
 
-static gboolean gst_dsexample_set_caps (GstBaseTransform * btrans,
+static gboolean gst_dsom_set_caps (GstBaseTransform * btrans,
     GstCaps * incaps, GstCaps * outcaps);
-static gboolean gst_dsexample_start (GstBaseTransform * btrans);
-static gboolean gst_dsexample_stop (GstBaseTransform * btrans);
+static gboolean gst_dsom_start (GstBaseTransform * btrans);
+static gboolean gst_dsom_stop (GstBaseTransform * btrans);
 
-static GstFlowReturn gst_dsexample_transform_ip (GstBaseTransform *
+static GstFlowReturn gst_dsom_transform_ip (GstBaseTransform *
     btrans, GstBuffer * inbuf);
 
 /* Install properties, set sink and src pad capabilities, override the required
@@ -126,7 +126,7 @@ static GstFlowReturn gst_dsexample_transform_ip (GstBaseTransform *
  * element.
  */
 static void
-gst_dsexample_class_init (GstDsExampleClass * klass)
+gst_dsom_class_init (GstDsExampleClass * klass)
 {
   GObjectClass *gobject_class;
   GstElementClass *gstelement_class;
@@ -140,15 +140,15 @@ gst_dsexample_class_init (GstDsExampleClass * klass)
   gstbasetransform_class = (GstBaseTransformClass *) klass;
 
   /* Overide base class functions */
-  gobject_class->set_property = GST_DEBUG_FUNCPTR (gst_dsexample_set_property);
-  gobject_class->get_property = GST_DEBUG_FUNCPTR (gst_dsexample_get_property);
+  gobject_class->set_property = GST_DEBUG_FUNCPTR (gst_dsom_set_property);
+  gobject_class->get_property = GST_DEBUG_FUNCPTR (gst_dsom_get_property);
 
-  gstbasetransform_class->set_caps = GST_DEBUG_FUNCPTR (gst_dsexample_set_caps);
-  gstbasetransform_class->start = GST_DEBUG_FUNCPTR (gst_dsexample_start);
-  gstbasetransform_class->stop = GST_DEBUG_FUNCPTR (gst_dsexample_stop);
+  gstbasetransform_class->set_caps = GST_DEBUG_FUNCPTR (gst_dsom_set_caps);
+  gstbasetransform_class->start = GST_DEBUG_FUNCPTR (gst_dsom_start);
+  gstbasetransform_class->stop = GST_DEBUG_FUNCPTR (gst_dsom_stop);
 
   gstbasetransform_class->transform_ip =
-      GST_DEBUG_FUNCPTR (gst_dsexample_transform_ip);
+      GST_DEBUG_FUNCPTR (gst_dsom_transform_ip);
 
   /* Install properties */
   g_object_class_install_property (gobject_class, PROP_UNIQUE_ID,
@@ -190,9 +190,9 @@ gst_dsexample_class_init (GstDsExampleClass * klass)
   
   /* Set sink and src pad capabilities */
   gst_element_class_add_pad_template (gstelement_class,
-      gst_static_pad_template_get (&gst_dsexample_src_template));
+      gst_static_pad_template_get (&gst_dsom_src_template));
   gst_element_class_add_pad_template (gstelement_class,
-      gst_static_pad_template_get (&gst_dsexample_sink_template));
+      gst_static_pad_template_get (&gst_dsom_sink_template));
 
   /* Set metadata describing the element */
   gst_element_class_set_details_simple (gstelement_class,
@@ -203,9 +203,9 @@ gst_dsexample_class_init (GstDsExampleClass * klass)
 }
 
 static void
-gst_dsexample_init (GstDsExample * dsexample)
+gst_dsom_init (GstDsExample * dsom)
 {
-  GstBaseTransform *btrans = GST_BASE_TRANSFORM (dsexample);
+  GstBaseTransform *btrans = GST_BASE_TRANSFORM (dsom);
 
   /* We will not be generating a new buffer. Just adding / updating
    * metadata. */
@@ -215,10 +215,10 @@ gst_dsexample_init (GstDsExample * dsexample)
   gst_base_transform_set_passthrough (GST_BASE_TRANSFORM (btrans), TRUE);
 
   /* Initialize all property variables to default values */
-  dsexample->unique_id = DEFAULT_UNIQUE_ID;
-  dsexample->gpu_id = DEFAULT_GPU_ID;
-  dsexample->mosaic_size = DEFAULT_MOSAIC_SIZE;
-  dsexample->class_ids = new std::set<uint>;
+  dsom->unique_id = DEFAULT_UNIQUE_ID;
+  dsom->gpu_id = DEFAULT_GPU_ID;
+  dsom->mosaic_size = DEFAULT_MOSAIC_SIZE;
+  dsom->class_ids = new std::set<uint>;
 
   /* This quark is required to identify NvDsMeta when iterating through
    * the buffer metadatas */
@@ -229,31 +229,31 @@ gst_dsexample_init (GstDsExample * dsexample)
 /* Function called when a property of the element is set. Standard boilerplate.
  */
 static void
-gst_dsexample_set_property (GObject * object, guint prop_id,
+gst_dsom_set_property (GObject * object, guint prop_id,
     const GValue * value, GParamSpec * pspec)
 {
-  GstDsExample *dsexample = GST_DSEXAMPLE (object);
+  GstDsExample *dsom = GST_DSEXAMPLE (object);
   switch (prop_id) {
     case PROP_UNIQUE_ID:
-      dsexample->unique_id = g_value_get_uint (value);
+      dsom->unique_id = g_value_get_uint (value);
       break;
     case PROP_GPU_DEVICE_ID:
-      dsexample->gpu_id = g_value_get_uint (value);
+      dsom->gpu_id = g_value_get_uint (value);
       break;
     case PROP_MIN_CONFIDENCE:
-      dsexample->min_confidence = g_value_get_double (value);
+      dsom->min_confidence = g_value_get_double (value);
       break;
     case PROP_MOSAIC_SIZE:
-      dsexample->mosaic_size = g_value_get_int (value);
+      dsom->mosaic_size = g_value_get_int (value);
       break;
     case PROP_CLASS_IDS:
     {
       std::stringstream str(g_value_get_string(value));
-      dsexample->class_ids->clear();
+      dsom->class_ids->clear();
       while(str.peek() != EOF) {
         gint class_id;
         str >> class_id;
-        dsexample->class_ids->insert(class_id);
+        dsom->class_ids->insert(class_id);
         str.get();
       }
     }
@@ -268,28 +268,28 @@ gst_dsexample_set_property (GObject * object, guint prop_id,
  * boilerplate.
  */
 static void
-gst_dsexample_get_property (GObject * object, guint prop_id,
+gst_dsom_get_property (GObject * object, guint prop_id,
     GValue * value, GParamSpec * pspec)
 {
-  GstDsExample *dsexample = GST_DSEXAMPLE (object);
+  GstDsExample *dsom = GST_DSEXAMPLE (object);
 
   switch (prop_id) {
     case PROP_UNIQUE_ID:
-      g_value_set_uint (value, dsexample->unique_id);
+      g_value_set_uint (value, dsom->unique_id);
       break;
     case PROP_GPU_DEVICE_ID:
-      g_value_set_uint (value, dsexample->gpu_id);
+      g_value_set_uint (value, dsom->gpu_id);
       break;
     case PROP_MIN_CONFIDENCE:
-      g_value_set_double (value, dsexample->min_confidence);
+      g_value_set_double (value, dsom->min_confidence);
       break;
     case PROP_MOSAIC_SIZE:
-      g_value_set_int (value, dsexample->mosaic_size);
+      g_value_set_int (value, dsom->mosaic_size);
       break;
     case PROP_CLASS_IDS:
     {
       std::stringstream str;
-      for(const auto id : *dsexample->class_ids)
+      for(const auto id : *dsom->class_ids)
         str << id << ";";
       g_value_set_string (value, str.str ().c_str ());
     }
@@ -304,40 +304,40 @@ gst_dsexample_get_property (GObject * object, guint prop_id,
  * Initialize all resources and start the output thread
  */
 static gboolean
-gst_dsexample_start (GstBaseTransform * btrans)
+gst_dsom_start (GstBaseTransform * btrans)
 {
-  GstDsExample *dsexample = GST_DSEXAMPLE (btrans);
+  GstDsExample *dsom = GST_DSEXAMPLE (btrans);
 
   GstQuery *queryparams = NULL;
   guint batch_size = 1;
   int val = -1;
 
-  CHECK_CUDA_STATUS (cudaSetDevice (dsexample->gpu_id),
+  CHECK_CUDA_STATUS (cudaSetDevice (dsom->gpu_id),
       "Unable to set cuda device");
 
-  cudaDeviceGetAttribute (&val, cudaDevAttrIntegrated, dsexample->gpu_id);
-  dsexample->is_integrated = val;
+  cudaDeviceGetAttribute (&val, cudaDevAttrIntegrated, dsom->gpu_id);
+  dsom->is_integrated = val;
 
-  dsexample->batch_size = 1;
+  dsom->batch_size = 1;
   queryparams = gst_nvquery_batch_size_new ();
   if (gst_pad_peer_query (GST_BASE_TRANSFORM_SINK_PAD (btrans), queryparams)
       || gst_pad_peer_query (GST_BASE_TRANSFORM_SRC_PAD (btrans), queryparams)) {
     if (gst_nvquery_batch_size_parse (queryparams, &batch_size)) {
-      dsexample->batch_size = batch_size;
+      dsom->batch_size = batch_size;
     }
   }
-  GST_DEBUG_OBJECT (dsexample, "Setting batch-size %d \n",
-      dsexample->batch_size);
+  GST_DEBUG_OBJECT (dsom, "Setting batch-size %d \n",
+      dsom->batch_size);
   gst_query_unref (queryparams);
 
-  CHECK_CUDA_STATUS (cudaStreamCreate (&dsexample->cuda_stream),
+  CHECK_CUDA_STATUS (cudaStreamCreate (&dsom->cuda_stream),
       "Could not create cuda stream");
 
   return TRUE;
 error:
-  if (dsexample->cuda_stream) {
-    cudaStreamDestroy (dsexample->cuda_stream);
-    dsexample->cuda_stream = NULL;
+  if (dsom->cuda_stream) {
+    cudaStreamDestroy (dsom->cuda_stream);
+    dsom->cuda_stream = NULL;
   }
   return FALSE;
 }
@@ -346,15 +346,15 @@ error:
  * Stop the output thread and free up all the resources
  */
 static gboolean
-gst_dsexample_stop (GstBaseTransform * btrans)
+gst_dsom_stop (GstBaseTransform * btrans)
 {
-  GstDsExample *dsexample = GST_DSEXAMPLE (btrans);
+  GstDsExample *dsom = GST_DSEXAMPLE (btrans);
 
-  if (dsexample->cuda_stream)
-    cudaStreamDestroy (dsexample->cuda_stream);
-  dsexample->cuda_stream = NULL;
+  if (dsom->cuda_stream)
+    cudaStreamDestroy (dsom->cuda_stream);
+  dsom->cuda_stream = NULL;
 
-  delete dsexample->class_ids;
+  delete dsom->class_ids;
 
   return TRUE;
 }
@@ -363,12 +363,12 @@ gst_dsexample_stop (GstBaseTransform * btrans)
  * Called when source / sink pad capabilities have been negotiated.
  */
 static gboolean
-gst_dsexample_set_caps (GstBaseTransform * btrans, GstCaps * incaps,
+gst_dsom_set_caps (GstBaseTransform * btrans, GstCaps * incaps,
     GstCaps * outcaps)
 {
-  GstDsExample *dsexample = GST_DSEXAMPLE (btrans);
+  GstDsExample *dsom = GST_DSEXAMPLE (btrans);
   /* Save the input video information, since this will be required later. */
-  gst_video_info_from_caps (&dsexample->video_info, incaps);
+  gst_video_info_from_caps (&dsom->video_info, incaps);
 
   return TRUE;
 
@@ -380,13 +380,13 @@ error:
  * Blur the detected objects
  */
 static GstFlowReturn
-blur_objects (GstDsExample * dsexample, gint idx,
+blur_objects (GstDsExample * dsom, gint idx,
     NvOSD_RectParams * crop_rect_params, cv::cuda::GpuMat in_mat, cv::Size ksize)
 {
   cv::Rect crop_rect;
 
   if ((crop_rect_params->width == 0) || (crop_rect_params->height == 0)) {
-    GST_ELEMENT_ERROR (dsexample, STREAM, FAILED,
+    GST_ELEMENT_ERROR (dsom, STREAM, FAILED,
         ("%s:crop_rect_params dimensions are zero",__func__), (NULL));
     return GST_FLOW_ERROR;
   }
@@ -407,9 +407,9 @@ blur_objects (GstDsExample * dsexample, gint idx,
  * Called when element recieves an input buffer from upstream element.
  */
 static GstFlowReturn
-gst_dsexample_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
+gst_dsom_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
 {
-  GstDsExample *dsexample = GST_DSEXAMPLE (btrans);
+  GstDsExample *dsom = GST_DSEXAMPLE (btrans);
   GstMapInfo in_map_info;
   GstFlowReturn flow_ret = GST_FLOW_ERROR;
   gdouble scale_ratio = 1.0;
@@ -419,8 +419,8 @@ gst_dsexample_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
   NvDsFrameMeta *frame_meta = NULL;
   NvDsMetaList * l_frame = NULL;
 
-  dsexample->frame_num++;
-  CHECK_CUDA_STATUS (cudaSetDevice (dsexample->gpu_id),
+  dsom->frame_num++;
+  CHECK_CUDA_STATUS (cudaSetDevice (dsom->gpu_id),
       "Unable to set cuda device");
 
   memset (&in_map_info, 0, sizeof (in_map_info));
@@ -429,18 +429,18 @@ gst_dsexample_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
     goto error;
   }
 
-  nvds_set_input_system_timestamp (inbuf, GST_ELEMENT_NAME (dsexample));
+  nvds_set_input_system_timestamp (inbuf, GST_ELEMENT_NAME (dsom));
   surface = (NvBufSurface *) in_map_info.data;
-  GST_DEBUG_OBJECT (dsexample,
+  GST_DEBUG_OBJECT (dsom,
       "Processing Frame %" G_GUINT64_FORMAT " Surface %p\n",
-      dsexample->frame_num, surface);
+      dsom->frame_num, surface);
 
-  if (CHECK_NVDS_MEMORY_AND_GPUID (dsexample, surface))
+  if (CHECK_NVDS_MEMORY_AND_GPUID (dsom, surface))
     goto error;
 
   batch_meta = gst_buffer_get_nvds_batch_meta (inbuf);
   if (batch_meta == nullptr) {
-    GST_ELEMENT_ERROR (dsexample, STREAM, FAILED,
+    GST_ELEMENT_ERROR (dsom, STREAM, FAILED,
         ("NvDsBatchMeta not found for input buffer."), (NULL));
     return GST_FLOW_ERROR;
   }
@@ -451,9 +451,9 @@ gst_dsexample_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
     NvDsMetaList * l_obj = NULL;
     NvDsObjectMeta *obj_meta = NULL;
 
-    if(!dsexample->is_integrated) {
+    if(!dsom->is_integrated) {
       if (!(surface->memType == NVBUF_MEM_CUDA_UNIFIED || surface->memType == NVBUF_MEM_CUDA_PINNED)){
-        GST_ELEMENT_ERROR (dsexample, STREAM, FAILED,
+        GST_ELEMENT_ERROR (dsom, STREAM, FAILED,
             ("%s:need NVBUF_MEM_CUDA_UNIFIED or NVBUF_MEM_CUDA_PINNED memory for opencv blurring",__func__), (NULL));
         return GST_FLOW_ERROR;
       }
@@ -496,27 +496,27 @@ gst_dsexample_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
         obj_meta = (NvDsObjectMeta *) (l_obj->data);
 
         /* Skip too small objects since they cause resizing issues. */
-        if (obj_meta->rect_params.width < dsexample->mosaic_size*2 ||
-            obj_meta->rect_params.height < dsexample->mosaic_size*2 ||
-            obj_meta->confidence < dsexample->min_confidence )
+        if (obj_meta->rect_params.width < dsom->mosaic_size*2 ||
+            obj_meta->rect_params.height < dsom->mosaic_size*2 ||
+            obj_meta->confidence < dsom->min_confidence )
           continue;
 
         /* apply blur only for objects with given class ids */
-        auto id_itr = dsexample->class_ids->find(obj_meta->class_id);
-        if ( id_itr == dsexample->class_ids->end() || *id_itr != obj_meta->class_id)
+        auto id_itr = dsom->class_ids->find(obj_meta->class_id);
+        if ( id_itr == dsom->class_ids->end() || *id_itr != obj_meta->class_id)
           continue;
 
         /* Calculate scaling destination size. */
-        ksize = cv::Size (obj_meta->rect_params.width / dsexample->mosaic_size,
-                          obj_meta->rect_params.height / dsexample->mosaic_size);
+        ksize = cv::Size (obj_meta->rect_params.width / dsom->mosaic_size,
+                          obj_meta->rect_params.height / dsom->mosaic_size);
 
-        if (blur_objects (dsexample, frame_meta->batch_id,
+        if (blur_objects (dsom, frame_meta->batch_id,
           &obj_meta->rect_params, in_mat, ksize) != GST_FLOW_OK) {
         /* Error in blurring, skip processing on object. */
-          GST_ELEMENT_ERROR (dsexample, STREAM, FAILED,
+          GST_ELEMENT_ERROR (dsom, STREAM, FAILED,
           ("blurring the object failed"), (NULL));
           if (NvBufSurfaceUnMapEglImage (&ip_surf, 0) != 0){
-            GST_ELEMENT_ERROR (dsexample, STREAM, FAILED,
+            GST_ELEMENT_ERROR (dsom, STREAM, FAILED,
               ("%s:buffer unmap failed", __func__), (NULL));
           }
           return GST_FLOW_ERROR;
@@ -533,7 +533,7 @@ gst_dsexample_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
 
 error:
 
-  nvds_set_output_system_timestamp (inbuf, GST_ELEMENT_NAME (dsexample));
+  nvds_set_output_system_timestamp (inbuf, GST_ELEMENT_NAME (dsom));
   gst_buffer_unmap (inbuf, &in_map_info);
   return flow_ret;
 }
@@ -542,9 +542,9 @@ error:
  * Boiler plate for registering a plugin and an element.
  */
 static gboolean
-dsexample_plugin_init (GstPlugin * plugin)
+dsom_plugin_init (GstPlugin * plugin)
 {
-  GST_DEBUG_CATEGORY_INIT (gst_dsexample_debug, "dsobjectsmosaic", 0,
+  GST_DEBUG_CATEGORY_INIT (gst_dsom_debug, "dsobjectsmosaic", 0,
       "dsobjectsmosaic plugin");
 
   return gst_element_register (plugin, "dsobjectsmosaic", GST_RANK_PRIMARY,
@@ -554,4 +554,4 @@ dsexample_plugin_init (GstPlugin * plugin)
 GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
     GST_VERSION_MINOR,
     nvdsgst_dsobjectsmosaic,
-    DESCRIPTION, dsexample_plugin_init, DS_VERSION, LICENSE, BINARY_PACKAGE, URL)
+    DESCRIPTION, dsom_plugin_init, DS_VERSION, LICENSE, BINARY_PACKAGE, URL)

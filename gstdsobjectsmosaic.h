@@ -61,7 +61,7 @@ typedef struct _GstDsExample GstDsExample;
 typedef struct _GstDsExampleClass GstDsExampleClass;
 
 /* Standard boilerplate stuff */
-#define GST_TYPE_DSEXAMPLE (gst_dsexample_get_type())
+#define GST_TYPE_DSEXAMPLE (gst_dsom_get_type())
 #define GST_DSEXAMPLE(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj),GST_TYPE_DSEXAMPLE,GstDsExample))
 #define GST_DSEXAMPLE_CLASS(klass) (G_TYPE_CHECK_CLASS_CAST((klass),GST_TYPE_DSEXAMPLE,GstDsExampleClass))
 #define GST_DSEXAMPLE_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), GST_TYPE_DSEXAMPLE, GstDsExampleClass))
@@ -111,7 +111,7 @@ struct _GstDsExampleClass
   GstBaseTransformClass parent_class;
 };
 
-GType gst_dsexample_get_type (void);
+GType gst_dsom_get_type (void);
 
 G_END_DECLS
 #endif /* __GST_DSEXAMPLE_H__ */
