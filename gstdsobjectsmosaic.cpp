@@ -67,11 +67,6 @@ enum
 #define DEFAULT_GPU_ID 0
 #define DEFAULT_MIN_CONFIDENCE 0
 
-#define RGB_BYTES_PER_PIXEL 3
-#define RGBA_BYTES_PER_PIXEL 4
-#define Y_BYTES_PER_PIXEL 1
-#define UV_BYTES_PER_PIXEL 2
-
 #define MIN_INPUT_OBJECT_WIDTH 16
 #define MIN_INPUT_OBJECT_HEIGHT 16
 
@@ -361,13 +356,6 @@ gst_dsexample_set_caps (GstBaseTransform * btrans, GstCaps * incaps,
   GstDsExample *dsexample = GST_DSEXAMPLE (btrans);
   /* Save the input video information, since this will be required later. */
   gst_video_info_from_caps (&dsexample->video_info, incaps);
-
-  /* requires RGBA format for blurring the objects in opencv */
-   if (dsexample->video_info.finfo->format != GST_VIDEO_FORMAT_RGBA) {
-    GST_ELEMENT_ERROR (dsexample, STREAM, FAILED,
-        ("input format should be RGBA when using blur-objects property"), (NULL));
-    goto error;
-    }
 
   return TRUE;
 
