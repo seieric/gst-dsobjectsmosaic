@@ -52,7 +52,7 @@
 #define LICENSE "Proprietary"
 #define DESCRIPTION "objects blurring plugin integrated with DeepStream on Jetson (not on dGPU)"
 #define BINARY_PACKAGE "blurring objects detected by NVIDIA nvinfer plugin"
-#define URL "http://nvidia.com/"
+#define URL "https://github.com/seieric/gst-dsobjectsmosaic"
 
 
 G_BEGIN_DECLS
