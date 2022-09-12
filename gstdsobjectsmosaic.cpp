@@ -43,6 +43,7 @@ enum
   PROP_GPU_DEVICE_ID,
   PROP_WIDTH,
   PROP_HEIGHT,
+  PROP_MIN_CONFIDENCE,
   PROP_CLASS_IDS
 };
 
@@ -66,6 +67,7 @@ enum
 /* Default values for properties */
 #define DEFAULT_UNIQUE_ID 15
 #define DEFAULT_GPU_ID 0
+#define DEFAULT_MIN_CONFIDENCE 0
 
 #define RGB_BYTES_PER_PIXEL 3
 #define RGBA_BYTES_PER_PIXEL 4
@@ -186,6 +188,13 @@ gst_dsexample_class_init (GstDsExampleClass * klass)
           "video height", 0, 
           G_MAXUINT, 0, (GParamFlags)
           (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
+
+  g_object_class_install_property (gobject_class, PROP_MIN_CONFIDENCE,
+      g_param_spec_double ("min-confidence",
+          "minimum confidence of objects to be blurred",
+          "minimum confidence of objects to be blurred", 0, 
+          G_MAXDOUBLE, DEFAULT_GPU_ID, (GParamFlags)
+          (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
   
   g_object_class_install_property (gobject_class, PROP_CLASS_IDS,
       g_param_spec_string ("class-ids",
@@ -251,6 +260,9 @@ gst_dsexample_set_property (GObject * object, guint prop_id,
     case PROP_HEIGHT:
       dsexample->height = g_value_get_uint (value);
       break;
+    case PROP_MIN_CONFIDENCE:
+      dsexample->min_confidence = g_value_get_double (value);
+      break;
     case PROP_CLASS_IDS:
     {
       std::stringstream str(g_value_get_string(value));
@@ -290,6 +302,9 @@ gst_dsexample_get_property (GObject * object, guint prop_id,
       break;
     case PROP_HEIGHT:
       g_value_set_uint (value, dsexample->height);
+      break;
+    case PROP_MIN_CONFIDENCE:
+      g_value_set_double (value, dsexample->min_confidence);
       break;
     case PROP_CLASS_IDS:
     {
@@ -508,7 +523,8 @@ gst_dsexample_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
 
         /* Skip too small objects since they cause resizing issues. */
         if (obj_meta->rect_params.width < MIN_INPUT_OBJECT_WIDTH ||
-            obj_meta->rect_params.height < MIN_INPUT_OBJECT_HEIGHT)
+            obj_meta->rect_params.height < MIN_INPUT_OBJECT_HEIGHT ||
+            obj_meta->confidence < dsexample->min_confidence )
           continue;
 
         /* apply blur only for objects with given class ids */

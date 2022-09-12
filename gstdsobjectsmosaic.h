@@ -99,6 +99,9 @@ struct _GstDsExample
   guint width;
   guint height;
 
+  // minimum confidence of objects to be blurred
+  gdouble min_confidence
+
   // class ids for which blur is applied
   std::set<uint> *class_ids;
 };
