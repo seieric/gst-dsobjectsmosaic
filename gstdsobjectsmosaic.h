@@ -57,19 +57,19 @@
 
 G_BEGIN_DECLS
 /* Standard boilerplate stuff */
-typedef struct _GstDsExample GstDsExample;
-typedef struct _GstDsExampleClass GstDsExampleClass;
+typedef struct _GstDsObjectsMosaic GstDsObjectsMosaic;
+typedef struct _GstDsObjectsMosaicClass GstDsObjectsMosaicClass;
 
 /* Standard boilerplate stuff */
 #define GST_TYPE_DSOM (gst_dsom_get_type())
-#define GST_DSOM(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj),GST_TYPE_DSOM,GstDsExample))
-#define GST_DSOM_CLASS(klass) (G_TYPE_CHECK_CLASS_CAST((klass),GST_TYPE_DSOM,GstDsExampleClass))
-#define GST_DSOM_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), GST_TYPE_DSOM, GstDsExampleClass))
+#define GST_DSOM(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj),GST_TYPE_DSOM,GstDsObjectsMosaic))
+#define GST_DSOM_CLASS(klass) (G_TYPE_CHECK_CLASS_CAST((klass),GST_TYPE_DSOM,GstDsObjectsMosaicClass))
+#define GST_DSOM_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), GST_TYPE_DSOM, GstDsObjectsMosaicClass))
 #define GST_IS_DSOM(obj) (G_TYPE_CHECK_INSTANCE_TYPE((obj),GST_TYPE_DSOM))
 #define GST_IS_DSOM_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE((klass),GST_TYPE_DSOM))
-#define GST_DSOM_CAST(obj)  ((GstDsExample *)(obj))
+#define GST_DSOM_CAST(obj)  ((GstDsObjectsMosaic *)(obj))
 
-struct _GstDsExample
+struct _GstDsObjectsMosaic
 {
   GstBaseTransform base_trans;
 
@@ -106,7 +106,7 @@ struct _GstDsExample
 };
 
 // Boiler plate stuff
-struct _GstDsExampleClass
+struct _GstDsObjectsMosaicClass
 {
   GstBaseTransformClass parent_class;
 };
