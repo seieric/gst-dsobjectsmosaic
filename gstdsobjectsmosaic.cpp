@@ -177,7 +177,7 @@ gst_dsexample_class_init (GstDsExampleClass * klass)
       g_param_spec_double ("min-confidence",
           "minimum confidence of objects to be blurred",
           "minimum confidence of objects to be blurred", 0, 
-          G_MAXDOUBLE, DEFAULT_GPU_ID, (GParamFlags)
+          1, DEFAULT_MIN_CONFIDENCE, (GParamFlags)
           (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
   
   g_object_class_install_property (gobject_class, PROP_CLASS_IDS,
