@@ -232,7 +232,7 @@ static void
 gst_dsom_set_property (GObject * object, guint prop_id,
     const GValue * value, GParamSpec * pspec)
 {
-  GstDsExample *dsom = GST_DSEXAMPLE (object);
+  GstDsExample *dsom = GST_DSOM (object);
   switch (prop_id) {
     case PROP_UNIQUE_ID:
       dsom->unique_id = g_value_get_uint (value);
@@ -271,7 +271,7 @@ static void
 gst_dsom_get_property (GObject * object, guint prop_id,
     GValue * value, GParamSpec * pspec)
 {
-  GstDsExample *dsom = GST_DSEXAMPLE (object);
+  GstDsExample *dsom = GST_DSOM (object);
 
   switch (prop_id) {
     case PROP_UNIQUE_ID:
@@ -306,7 +306,7 @@ gst_dsom_get_property (GObject * object, guint prop_id,
 static gboolean
 gst_dsom_start (GstBaseTransform * btrans)
 {
-  GstDsExample *dsom = GST_DSEXAMPLE (btrans);
+  GstDsExample *dsom = GST_DSOM (btrans);
 
   GstQuery *queryparams = NULL;
   guint batch_size = 1;
@@ -348,7 +348,7 @@ error:
 static gboolean
 gst_dsom_stop (GstBaseTransform * btrans)
 {
-  GstDsExample *dsom = GST_DSEXAMPLE (btrans);
+  GstDsExample *dsom = GST_DSOM (btrans);
 
   if (dsom->cuda_stream)
     cudaStreamDestroy (dsom->cuda_stream);
@@ -366,7 +366,7 @@ static gboolean
 gst_dsom_set_caps (GstBaseTransform * btrans, GstCaps * incaps,
     GstCaps * outcaps)
 {
-  GstDsExample *dsom = GST_DSEXAMPLE (btrans);
+  GstDsExample *dsom = GST_DSOM (btrans);
   /* Save the input video information, since this will be required later. */
   gst_video_info_from_caps (&dsom->video_info, incaps);
 
@@ -409,7 +409,7 @@ blur_objects (GstDsExample * dsom, gint idx,
 static GstFlowReturn
 gst_dsom_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
 {
-  GstDsExample *dsom = GST_DSEXAMPLE (btrans);
+  GstDsExample *dsom = GST_DSOM (btrans);
   GstMapInfo in_map_info;
   GstFlowReturn flow_ret = GST_FLOW_ERROR;
   gdouble scale_ratio = 1.0;
@@ -548,7 +548,7 @@ dsom_plugin_init (GstPlugin * plugin)
       "dsobjectsmosaic plugin");
 
   return gst_element_register (plugin, "dsobjectsmosaic", GST_RANK_PRIMARY,
-      GST_TYPE_DSEXAMPLE);
+      GST_TYPE_DSOM);
 }
 
 GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,

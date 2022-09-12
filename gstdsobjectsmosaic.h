@@ -23,8 +23,8 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef __GST_DSEXAMPLE_H__
-#define __GST_DSEXAMPLE_H__
+#ifndef __GST_DSOM_H__
+#define __GST_DSOM_H__
 
 #include <gst/base/gstbasetransform.h>
 #include <gst/video/video.h>
@@ -61,13 +61,13 @@ typedef struct _GstDsExample GstDsExample;
 typedef struct _GstDsExampleClass GstDsExampleClass;
 
 /* Standard boilerplate stuff */
-#define GST_TYPE_DSEXAMPLE (gst_dsom_get_type())
-#define GST_DSEXAMPLE(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj),GST_TYPE_DSEXAMPLE,GstDsExample))
-#define GST_DSEXAMPLE_CLASS(klass) (G_TYPE_CHECK_CLASS_CAST((klass),GST_TYPE_DSEXAMPLE,GstDsExampleClass))
-#define GST_DSEXAMPLE_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), GST_TYPE_DSEXAMPLE, GstDsExampleClass))
-#define GST_IS_DSEXAMPLE(obj) (G_TYPE_CHECK_INSTANCE_TYPE((obj),GST_TYPE_DSEXAMPLE))
-#define GST_IS_DSEXAMPLE_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE((klass),GST_TYPE_DSEXAMPLE))
-#define GST_DSEXAMPLE_CAST(obj)  ((GstDsExample *)(obj))
+#define GST_TYPE_DSOM (gst_dsom_get_type())
+#define GST_DSOM(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj),GST_TYPE_DSOM,GstDsExample))
+#define GST_DSOM_CLASS(klass) (G_TYPE_CHECK_CLASS_CAST((klass),GST_TYPE_DSOM,GstDsExampleClass))
+#define GST_DSOM_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), GST_TYPE_DSOM, GstDsExampleClass))
+#define GST_IS_DSOM(obj) (G_TYPE_CHECK_INSTANCE_TYPE((obj),GST_TYPE_DSOM))
+#define GST_IS_DSOM_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE((klass),GST_TYPE_DSOM))
+#define GST_DSOM_CAST(obj)  ((GstDsExample *)(obj))
 
 struct _GstDsExample
 {
@@ -114,4 +114,4 @@ struct _GstDsExampleClass
 GType gst_dsom_get_type (void);
 
 G_END_DECLS
-#endif /* __GST_DSEXAMPLE_H__ */
+#endif /* __GST_DSOM_H__ */
