@@ -41,8 +41,6 @@ enum
   PROP_0,
   PROP_UNIQUE_ID,
   PROP_GPU_DEVICE_ID,
-  PROP_WIDTH,
-  PROP_HEIGHT,
   PROP_MIN_CONFIDENCE,
   PROP_CLASS_IDS
 };
@@ -175,20 +173,6 @@ gst_dsexample_class_init (GstDsExampleClass * klass)
           (G_PARAM_READWRITE |
               G_PARAM_STATIC_STRINGS | GST_PARAM_MUTABLE_READY)));
 
-  g_object_class_install_property (gobject_class, PROP_WIDTH,
-      g_param_spec_uint ("width",
-          "video width",
-          "video width", 0, 
-          G_MAXUINT, 0, (GParamFlags)
-          (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
-
-  g_object_class_install_property (gobject_class, PROP_HEIGHT,
-      g_param_spec_uint ("height",
-          "video height",
-          "video height", 0, 
-          G_MAXUINT, 0, (GParamFlags)
-          (G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS)));
-
   g_object_class_install_property (gobject_class, PROP_MIN_CONFIDENCE,
       g_param_spec_double ("min-confidence",
           "minimum confidence of objects to be blurred",
@@ -254,12 +238,6 @@ gst_dsexample_set_property (GObject * object, guint prop_id,
     case PROP_GPU_DEVICE_ID:
       dsexample->gpu_id = g_value_get_uint (value);
       break;
-    case PROP_WIDTH:
-      dsexample->width = g_value_get_uint (value);
-      break;
-    case PROP_HEIGHT:
-      dsexample->height = g_value_get_uint (value);
-      break;
     case PROP_MIN_CONFIDENCE:
       dsexample->min_confidence = g_value_get_double (value);
       break;
@@ -296,12 +274,6 @@ gst_dsexample_get_property (GObject * object, guint prop_id,
       break;
     case PROP_GPU_DEVICE_ID:
       g_value_set_uint (value, dsexample->gpu_id);
-      break;
-    case PROP_WIDTH:
-      g_value_set_uint (value, dsexample->width);
-      break;
-    case PROP_HEIGHT:
-      g_value_set_uint (value, dsexample->height);
       break;
     case PROP_MIN_CONFIDENCE:
       g_value_set_double (value, dsexample->min_confidence);
