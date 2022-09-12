@@ -385,12 +385,6 @@ blur_objects (GstDsObjectsMosaic * dsom, gint idx,
 {
   cv::Rect crop_rect;
 
-  if ((crop_rect_params->width == 0) || (crop_rect_params->height == 0)) {
-    GST_ELEMENT_ERROR (dsom, STREAM, FAILED,
-        ("%s:crop_rect_params dimensions are zero",__func__), (NULL));
-    return GST_FLOW_ERROR;
-  }
-
 /* rectangle for cropped objects */
   crop_rect = cv::Rect (crop_rect_params->left, crop_rect_params->top,
   crop_rect_params->width, crop_rect_params->height);
