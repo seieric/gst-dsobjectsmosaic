@@ -102,7 +102,7 @@ GST_STATIC_PAD_TEMPLATE ("sink",
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
         (GST_CAPS_FEATURE_MEMORY_NVMM,
-            "{ NV12, RGBA, I420 }")));
+            "{ RGBA }")));
 
 static GstStaticPadTemplate gst_dsexample_src_template =
 GST_STATIC_PAD_TEMPLATE ("src",
@@ -110,7 +110,7 @@ GST_STATIC_PAD_TEMPLATE ("src",
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
         (GST_CAPS_FEATURE_MEMORY_NVMM,
-            "{ NV12, RGBA, I420 }")));
+            "{ RGBA }")));
 
 /* Define our element type. Standard GObject/GStreamer boilerplate stuff */
 #define gst_dsexample_parent_class parent_class
