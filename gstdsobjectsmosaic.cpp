@@ -312,7 +312,6 @@ static gboolean
 gst_dsexample_start (GstBaseTransform * btrans)
 {
   GstDsExample *dsexample = GST_DSEXAMPLE (btrans);
-  NvBufSurfaceCreateParams create_params;
 
   GstQuery *queryparams = NULL;
   guint batch_size = 1;
@@ -339,32 +338,6 @@ gst_dsexample_start (GstBaseTransform * btrans)
   CHECK_CUDA_STATUS (cudaStreamCreate (&dsexample->cuda_stream),
       "Could not create cuda stream");
 
-  if (dsexample->inter_buf)
-    NvBufSurfaceDestroy (dsexample->inter_buf);
-  dsexample->inter_buf = NULL;
-
-  /* An intermediate buffer for NV12/RGBA to BGR conversion  will be
-   * required. Can be skipped if custom algorithm can work directly on NV12/RGBA. */
-  create_params.gpuId  = dsexample->gpu_id;
-  create_params.width = dsexample->width;
-  create_params.height = dsexample->height;
-  create_params.size = 0;
-  create_params.colorFormat = NVBUF_COLOR_FORMAT_RGBA;
-  create_params.layout = NVBUF_LAYOUT_PITCH;
-
-  if(dsexample->is_integrated) {
-    create_params.memType = NVBUF_MEM_DEFAULT;
-  }
-  else {
-    create_params.memType = NVBUF_MEM_CUDA_PINNED;
-  }
-
-  if (NvBufSurfaceCreate (&dsexample->inter_buf, 1,
-          &create_params) != 0) {
-    GST_ERROR ("Error: Could not allocate internal buffer for dsexample");
-    goto error;
-  }
-
   return TRUE;
 error:
   if (dsexample->cuda_stream) {
@@ -381,10 +354,6 @@ static gboolean
 gst_dsexample_stop (GstBaseTransform * btrans)
 {
   GstDsExample *dsexample = GST_DSEXAMPLE (btrans);
-
-  if (dsexample->inter_buf)
-    NvBufSurfaceDestroy(dsexample->inter_buf);
-  dsexample->inter_buf = NULL;
 
   if (dsexample->cuda_stream)
     cudaStreamDestroy (dsexample->cuda_stream);
@@ -514,11 +483,8 @@ gst_dsexample_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
       ip_surf = *surface;
       ip_surf.numFilled = ip_surf.batchSize = 1;
       ip_surf.surfaceList = &(surface->surfaceList[frame_meta->batch_id]);
-      NvBufSurfaceMemSet (dsexample->inter_buf, 0, 0, 0);
-      if (NvBufSurfaceCopy (&ip_surf, dsexample->inter_buf) != 0) {
-        goto error;
-      }
-      if (NvBufSurfaceMapEglImage (dsexample->inter_buf, 0) !=0 ) {
+      /* map and modify original buffer directly */
+      if (NvBufSurfaceMapEglImage (&ip_surf, 0) != 0) {
         goto error;
       }
       CUresult status;
@@ -526,13 +492,13 @@ gst_dsexample_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
       CUgraphicsResource pResource = NULL;
       cudaFree(0);
       status = cuGraphicsEGLRegisterImage(&pResource,
-		  dsexample->inter_buf->surfaceList[0].mappedAddr.eglImage,
+		  ip_surf.surfaceList[0].mappedAddr.eglImage,
                   CU_GRAPHICS_MAP_RESOURCE_FLAGS_NONE);
       status = cuGraphicsResourceGetMappedEglFrame(&eglFrame, pResource, 0, 0);
       status = cuCtxSynchronize();
 
-      cv::cuda::GpuMat in_mat(dsexample->inter_buf->surfaceList[0].planeParams.height[0],
-                  dsexample->inter_buf->surfaceList[0].planeParams.width[0],
+      cv::cuda::GpuMat in_mat(ip_surf.surfaceList[0].planeParams.height[0],
+                  ip_surf.surfaceList[0].planeParams.width[0],
                   CV_8UC4, eglFrame.frame.pPitch[0]);
 
       for (l_obj = frame_meta->obj_meta_list; l_obj != NULL;
@@ -555,7 +521,7 @@ gst_dsexample_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
         /* Error in blurring, skip processing on object. */
           GST_ELEMENT_ERROR (dsexample, STREAM, FAILED,
           ("blurring the object failed"), (NULL));
-          if (NvBufSurfaceUnMapEglImage (dsexample->inter_buf, 0) != 0){
+          if (NvBufSurfaceUnMapEglImage (&ip_surf, 0) != 0){
             GST_ELEMENT_ERROR (dsexample, STREAM, FAILED,
               ("%s:buffer unmap failed", __func__), (NULL));
           }
@@ -565,10 +531,8 @@ gst_dsexample_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
 
       status = cuCtxSynchronize();
       status = cuGraphicsUnregisterResource(pResource);
-      // apply back to the original buffer
-      NvBufSurfaceCopy (dsexample->inter_buf, &ip_surf);
       // Destroy the EGLImage
-      NvBufSurfaceUnMapEglImage (dsexample->inter_buf, 0);
+      NvBufSurfaceUnMapEglImage (&ip_surf, 0);
     }
   }
   flow_ret = GST_FLOW_OK;

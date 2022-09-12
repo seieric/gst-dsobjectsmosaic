@@ -83,9 +83,6 @@ struct _GstDsExample
   // CUDA Stream used for allocating the CUDA task
   cudaStream_t cuda_stream;
 
-  // the intermediate scratch buffer for conversions RGBA
-  NvBufSurface *inter_buf;
-
   // Input video info (resolution, color format, framerate, etc)
   GstVideoInfo video_info;
 
