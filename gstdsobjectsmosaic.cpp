@@ -461,12 +461,7 @@ gst_dsom_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
       if (frame_meta->num_obj_meta == 0)
         continue;
 
-      NvBufSurface ip_surf;
-      ip_surf = *surface;
-      ip_surf.numFilled = ip_surf.batchSize = 1;
-      ip_surf.surfaceList = &(surface->surfaceList[frame_meta->batch_id]);
-      /* map and modify original buffer directly */
-      if (NvBufSurfaceMapEglImage (&ip_surf, 0) != 0) {
+      if (NvBufSurfaceMapEglImage (surface, frame_meta->batch_id) != 0) {
         goto error;
       }
       CUresult status;
@@ -474,14 +469,14 @@ gst_dsom_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
       CUgraphicsResource pResource = NULL;
       cudaFree(0);
       status = cuGraphicsEGLRegisterImage(&pResource,
-		  ip_surf.surfaceList[0].mappedAddr.eglImage,
+		  surface->surfaceList[frame_meta->batch_id].mappedAddr.eglImage,
                   CU_GRAPHICS_MAP_RESOURCE_FLAGS_NONE);
       status = cuGraphicsResourceGetMappedEglFrame(&eglFrame, pResource, 0, 0);
       status = cuCtxSynchronize();
 
       cv::Size ksize;
-      cv::cuda::GpuMat in_mat(ip_surf.surfaceList[0].planeParams.height[0],
-                  ip_surf.surfaceList[0].planeParams.width[0],
+      cv::cuda::GpuMat in_mat(surface->surfaceList[frame_meta->batch_id].planeParams.height[0],
+                  surface->surfaceList[frame_meta->batch_id].planeParams.width[0],
                   CV_8UC4, eglFrame.frame.pPitch[0]);
 
       for (l_obj = frame_meta->obj_meta_list; l_obj != NULL;
@@ -509,7 +504,7 @@ gst_dsom_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
         /* Error in blurring, skip processing on object. */
           GST_ELEMENT_ERROR (dsom, STREAM, FAILED,
           ("blurring the object failed"), (NULL));
-          if (NvBufSurfaceUnMapEglImage (&ip_surf, 0) != 0){
+          if (NvBufSurfaceUnMapEglImage (surface, frame_meta->batch_id) != 0){
             GST_ELEMENT_ERROR (dsom, STREAM, FAILED,
               ("%s:buffer unmap failed", __func__), (NULL));
           }
@@ -520,7 +515,7 @@ gst_dsom_transform_ip (GstBaseTransform * btrans, GstBuffer * inbuf)
       status = cuCtxSynchronize();
       status = cuGraphicsUnregisterResource(pResource);
       // Destroy the EGLImage
-      NvBufSurfaceUnMapEglImage (&ip_surf, 0);
+      NvBufSurfaceUnMapEglImage (surface, frame_meta->batch_id);
     }
   }
   flow_ret = GST_FLOW_OK;
